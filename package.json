@@ -1,0 +1,31 @@
+{
+  "name": "objc",
+  "version": "0.0.0",
+  "description": "NodeJS ⇆ Objective-C bridge",
+  "license": "MIT",
+  "repository": "lukaskollmer/objc",
+  "author": {
+    "name": "Lukas Kollmer",
+    "email": "lukas.kollmer@gmail.com",
+    "url": "lukas.vip"
+  },
+  "engines": {
+    "node": ">=4"
+  },
+  "scripts": {
+    "test": "xo && ava"
+  },
+  "files": [
+    "index.js"
+  ],
+  "keywords": [
+    ""
+  ],
+  "dependencies": {
+    "ffi": "^2.2.0"
+  },
+  "devDependencies": {
+    "ava": "^0.17.0",
+    "xo": "^0.17.0"
+  }
+}
