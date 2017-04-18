@@ -168,7 +168,11 @@ namespace ObjC {
             return;
         } else if (EQUAL(returnType, "Q")) { // unsigned long long
             unsigned long long retval = objc_call(unsigned long long, obj->obj_, sel);
-            args.GetReturnValue().Set((double)retval);
+            args.GetReturnValue().Set((double) retval);
+            return;
+        } else if (EQUAL(returnType, "d")) { // double
+            double retval = objc_call(double, obj->obj_, sel);
+            args.GetReturnValue().Set(retval);
             return;
         } else {
             char *excMessage;
