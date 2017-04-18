@@ -101,6 +101,12 @@ namespace ObjC {
 
     }
 
+#define UNSUPPORTED_RETURN_TYPE(type) \
+    char *excMessage; \
+    asprintf(&excMessage, "Return type '%s'not yet supported", returnType); \
+    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage))); \
+    free(excMessage); \
+
     void Proxy::Call(const FunctionCallbackInfo<Value>& args) {
         //printf("%s\n", __PRETTY_FUNCTION__);
         Isolate *isolate = args.GetIsolate();
@@ -166,13 +172,67 @@ namespace ObjC {
 
             args.GetReturnValue().Set(instance);
             return;
+        } else if (EQUAL(returnType, "c")) { // char
+            UNSUPPORTED_RETURN_TYPE(returnType);
+            return;
+        } else if (EQUAL(returnType, "i")) { // int
+            int retval = objc_call(int, obj->obj_, sel);
+            args.GetReturnValue().Set(retval);
+            return;
+        } else if (EQUAL(returnType, "s")) { // short
+            UNSUPPORTED_RETURN_TYPE(returnType);
+            return;
+        } else if (EQUAL(returnType, "l")) { // A longl is treated as a 32-bit quantity on 64-bit programs
+            UNSUPPORTED_RETURN_TYPE(returnType);
+            return;
+        } else if (EQUAL(returnType, "q")) { // long long
+            long long retval = objc_call(long long, obj->obj_, sel);
+            args.GetReturnValue().Set((double)retval);
+            return;
+        } else if (EQUAL(returnType, "C")) { // unsigned char
+            UNSUPPORTED_RETURN_TYPE(returnType);
+            return;
+        } else if (EQUAL(returnType, "I")) { // unsigned int
+            unsigned int retval = objc_call(unsigned int, obj->obj_, sel);
+            args.GetReturnValue().Set((double)retval);
+            return;
+        } else if (EQUAL(returnType, "S")) { // unsigned short
+            unsigned short retval = objc_call(unsigned short, obj->obj_, sel);
+            args.GetReturnValue().Set(retval);
+            return;
         } else if (EQUAL(returnType, "Q")) { // unsigned long long
             unsigned long long retval = objc_call(unsigned long long, obj->obj_, sel);
             args.GetReturnValue().Set((double) retval);
             return;
+        } else if (EQUAL(returnType, "f")) { // float
+            float retval = objc_call(float, obj->obj_, sel);
+            args.GetReturnValue().Set(retval);
+            return;
         } else if (EQUAL(returnType, "d")) { // double
             double retval = objc_call(double, obj->obj_, sel);
             args.GetReturnValue().Set(retval);
+            return;
+        } else if (EQUAL(returnType, "B")) { // bool
+            bool retval = objc_call(bool, obj->obj_, sel);
+            args.GetReturnValue().Set(retval);
+            return;
+        } else if (EQUAL(returnType, "v")) { // void
+            // Custom cast because the macro would attempt to initialize a variable to type void, which would fail
+            void (*msgSend_void)(id, SEL, ...) = (void (*) (id, SEL, ...)) objc_msgSend;
+            msgSend_void(obj->obj_, sel_getUid(sel));
+            args.GetReturnValue().Set(Undefined(isolate));
+            return;
+        } else if (EQUAL(returnType, "*")) { // char *
+            char* retval = objc_call(char*, obj->obj_, sel);
+            args.GetReturnValue().Set(String::NewFromUtf8(isolate, retval));
+            return;
+        } else if (EQUAL(returnType, "#")) { // Class
+            UNSUPPORTED_RETURN_TYPE(returnType);
+            // TODO return class wrapper
+            return;
+        } else if (EQUAL(returnType, ":")) { // SEL
+            UNSUPPORTED_RETURN_TYPE(returnType);
+            // TOOD ¯\_(ツ)_/¯
             return;
         } else {
             char *excMessage;
