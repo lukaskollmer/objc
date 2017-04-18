@@ -131,7 +131,7 @@ namespace ObjC {
         if (EQUAL(returnType, "@")) {
             id retval = objc_call(id, obj->obj_, sel);
 
-            auto isKindOfClass = [] (id object, const char* classname) -> bool {
+            auto isKindOfClass = [](id object, const char *classname) -> bool {
                 return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
             };
 
@@ -158,13 +158,17 @@ namespace ObjC {
             object->SetAlignedPointerInInternalField(0, retval);
 
             const unsigned argc = 2;
-            Local<Value> argv[argc] = { Number::New(isolate, 1), object };
+            Local<Value> argv[argc] = {Number::New(isolate, 1), object};
             Local<Function> cons = Local<Function>::New(isolate, constructor);
             Local<Context> context = isolate->GetCurrentContext();
             Local<Object> instance =
                     cons->NewInstance(context, argc, argv).ToLocalChecked();
 
             args.GetReturnValue().Set(instance);
+            return;
+        } else if (EQUAL(returnType, "Q")) { // unsigned long long
+            unsigned long long retval = objc_call(unsigned long long, obj->obj_, sel);
+            args.GetReturnValue().Set((double)retval);
             return;
         } else {
             char *excMessage;
