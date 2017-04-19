@@ -252,13 +252,16 @@ namespace ObjC {
             } else if (EQUAL(expectedType, "C")) { // unsigned char
                 ARGTYPE_NOT_SUPPORTED("unsigned char");
             } else if (EQUAL(expectedType, "I")) { // unsigned int
-                ARGTYPE_NOT_SUPPORTED("unsigned int");
+                unsigned int argument = (unsigned int) arg->ToNumber()->Int32Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
             } else if (EQUAL(expectedType, "S")) { // unsigned short
                 ARGTYPE_NOT_SUPPORTED("unsigned short");
             } else if (EQUAL(expectedType, "L")) { // unsigned long
-                ARGTYPE_NOT_SUPPORTED("unsigned long");
+                unsigned long argument = (unsigned long) arg->ToNumber()->Int32Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
             } else if (EQUAL(expectedType, "Q")) { // unsigned long long
-                ARGTYPE_NOT_SUPPORTED("unsigned long long");
+                unsigned long long argument = (unsigned long long) arg->ToNumber()->Int32Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
             } else if (EQUAL(expectedType, "f")) { // float
                 float argument = (float) arg->ToNumber()->Value();
                 invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
