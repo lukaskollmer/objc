@@ -9,15 +9,13 @@
     "email": "lukas.kollmer@gmail.com",
     "url": "lukas.vip"
   },
-  "main": "./lib/index.js",
+  "main": "./src/index.js",
   "engines": {
     "node": ">=4"
   },
   "scripts": {
     "test": "xo && ava --verbose",
-    "compile": "node-gyp build && babel --presets es2015,stage-0 -d lib/ src/",
-    "start": "npm run compile && node example.js",
-    "prepublish": "npm run compile"
+    "start": "node-gyp build && node example.js"
   },
   "keywords": [
     "objc"

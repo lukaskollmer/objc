@@ -1,5 +1,4 @@
-
-export function ObjCProxy(object) {
+function ObjCProxy(object) {
   return new Proxy(object, {
     get: (target, name) => {
       if (name === Symbol.toPrimitive) { // this is called for string substitutions like `obj: ${obj}`
@@ -30,7 +29,7 @@ export function ObjCProxy(object) {
   });
 }
 
-export function MethodProxy(object, methodName) {
+function MethodProxy(object, methodName) {
   return new Proxy(() => {}, {
     get: (target, name) => {
       if (name === 'inspect') {
@@ -50,3 +49,8 @@ export function MethodProxy(object, methodName) {
     }
   });
 }
+
+module.exports = {
+  ObjCProxy,
+  MethodProxy
+};
