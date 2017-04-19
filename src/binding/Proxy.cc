@@ -293,6 +293,7 @@ namespace ObjC {
         } else if (EQUAL(returnType, "S")) { // unsigned short
             HANDLE_RETURN_TYPE(unsigned short);
         } else if (EQUAL(returnType, "L")) { // unsigned long
+            HANDLE_RETURN_TYPE_CAST(unsigned long, int32_t);
         } else if (EQUAL(returnType, "Q")) { // unsigned long long
             HANDLE_RETURN_TYPE_CAST(unsigned long long, int32_t);
         } else if (EQUAL(returnType, "f")) { // float
