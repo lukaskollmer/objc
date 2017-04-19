@@ -9,6 +9,7 @@
 #include <array>
 #include "Proxy.h"
 #include "objc_call.h"
+#include <typeinfo>
 
 #include "Invocation.h"
 #include "utils.h"
@@ -39,6 +40,12 @@ SEL resolveSelector(id target, const char *sel) {
     args.GetReturnValue().Set((castType)retval); \
     return; \
 
+#define ARGTYPE_NOT_SUPPORTED(type) \
+    char *excMessage; \
+    asprintf(&excMessage, "Error setting argument: Type '%s' not yet supported. Sorry.", type); \
+    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage))); \
+    free(excMessage); \
+    return; \
 
 
 
@@ -148,6 +155,8 @@ namespace ObjC {
             case Type::instance: method = class_getInstanceMethod(object_getClass(obj->obj_), sel); break;
         }
 
+        //printf("%s - %s\n", sel_getName(sel), method_getTypeEncoding(method));
+
 
         auto invocation = ObjC::Invocation(obj->obj_, sel);
         invocation.SetTarget(obj->obj_);
@@ -225,6 +234,45 @@ namespace ObjC {
                         // TODO pass nil?
                     }
                 }
+            } else if (EQUAL(expectedType, "c")) { // char
+                ARGTYPE_NOT_SUPPORTED("char");
+            } else if (EQUAL(expectedType, "i")) { // int
+                int argument = arg->ToNumber()->ToInt32()->Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
+            } else if (EQUAL(expectedType, "s")) { // short
+                ARGTYPE_NOT_SUPPORTED("short");
+            } else if (EQUAL(expectedType, "q")) { // long long
+                long long argument = (long long) arg->ToNumber()->Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
+            } else if (EQUAL(expectedType, "C")) { // unsigned char
+                ARGTYPE_NOT_SUPPORTED("unsigned char");
+            } else if (EQUAL(expectedType, "I")) { // unsigned int
+                ARGTYPE_NOT_SUPPORTED("unsigned int");
+            } else if (EQUAL(expectedType, "S")) { // unsigned short
+                ARGTYPE_NOT_SUPPORTED("unsigned short");
+            } else if (EQUAL(expectedType, "L")) { // unsigned long
+                ARGTYPE_NOT_SUPPORTED("unsigned long");
+            } else if (EQUAL(expectedType, "Q")) { // unsigned long long
+                ARGTYPE_NOT_SUPPORTED("unsigned long long");
+            } else if (EQUAL(expectedType, "f")) { // float
+                float argument = (float) arg->ToNumber()->Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
+            } else if (EQUAL(expectedType, "d")) { // double
+                double argument = arg->ToNumber()->Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
+            } else if (EQUAL(expectedType, "B")) { // bool
+                bool argument = arg->ToBoolean()->Value();
+                invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
+            } else if (EQUAL(expectedType, "v")) { // void
+                ARGTYPE_NOT_SUPPORTED("void");
+            } else if (EQUAL(expectedType, "*") || EQUAL(expectedType, "r*")) { // char*, const char*
+                ARGTYPE_NOT_SUPPORTED("char*");
+            } else if (EQUAL(expectedType, ":")) { // SEL
+                // selectors can be passed as strings.
+                SEL _sel = sel_getUid(ValueToChar(isolate, arg));
+                invocation.SetArgumentAtIndex(&_sel, objcArgumentIndex);
+            } else if (EQUAL(expectedType, "^v") || EQUAL(expectedType, "r^v")) { // void*, const void*
+                ARGTYPE_NOT_SUPPORTED("void*");
             }
         }
 
