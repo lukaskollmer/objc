@@ -1,9 +1,26 @@
 import test from 'ava';
-import fn from '.';
 
-test('title', t => {
-  const err = t.throws(() => fn(123), TypeError);
-  t.is(err.message, 'Expected a string, got number');
+const objc = require('./lib/index.js');
 
-  t.is(fn('unicorns'), 'unicorns & rainbows');
+const {
+  NSString,
+  NSNumber
+} = objc;
+
+test('string creation', t => {
+  let string = NSString.stringWithString_('Hello World');
+  t.is(String(string), 'Hello World');
+});
+
+test('primitive return values', t => {
+  let string = NSString.stringWithString_('I am the doctor');
+  let length = string.length();
+
+  t.is(length, 15);
+  t.is(typeof length, 'number');
+});
+
+test('primitive argument types', t => {
+  let number = NSNumber.numberWithInt_(5);
+  t.is(Number(number), 5);
 });

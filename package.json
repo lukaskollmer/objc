@@ -14,7 +14,7 @@
     "node": ">=4"
   },
   "scripts": {
-    "test": "xo && ava",
+    "test": "xo && ava --verbose",
     "compile": "node-gyp build && babel --presets es2015,stage-0 -d lib/ src/",
     "start": "npm run compile && node example.js",
     "prepublish": "npm run compile"
