@@ -6,7 +6,11 @@ export function ObjCProxy(object) {
     get: (target, name) => {
       if (name === Symbol.toPrimitive) { // this is called for string substitutions like `obj: ${obj}`
         return (hint) => {
-          console.log(`ToPrimitive: ${hint}`);
+          if (hint === 'string' && target.call("isKindOfClass:", "NSString")) {
+            return target.call("UTF8String");
+          } else if (hint === 'number' && target.call("isKindOfClass:", "NSNumber")) {
+            return target.call("doubleValue");
+          }
           return target.description();
         }
       }
