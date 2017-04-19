@@ -1,33 +1,31 @@
-import ref from 'ref';
-import ProxyType from './enums.js';
 
 export function ObjCProxy(object) {
   return new Proxy(object, {
     get: (target, name) => {
       if (name === Symbol.toPrimitive) { // this is called for string substitutions like `obj: ${obj}`
-        return (hint) => {
-          if (hint === 'string' && target.call("isKindOfClass:", "NSString")) {
-            return target.call("UTF8String");
-          } else if (hint === 'number' && target.call("isKindOfClass:", "NSNumber")) {
-            return target.call("doubleValue");
+        return hint => {
+          if (hint === 'string' && target.call('isKindOfClass:', 'NSString')) { // NSMutableString
+            return target.call('UTF8String');
+          } else if (hint === 'number' && target.call('isKindOfClass:', 'NSNumber')) {
+            return target.call('doubleValue');
           }
           return target.description();
-        }
+        };
       }
 
       name = String(name);
       if (name === 'Symbol(util.inspect.custom)') {
-        return (deps, opts) => {
-          let type = target.type() == 0 ? 'Class' : 'Instance';
+        return () => {
+          let type = target.type() === 0 ? 'Class' : 'Instance';
           return `[objc.${type}Proxy ${target.description()}]`;
         };
       }
 
-      if (name === "__ptr") {
+      if (name === '__ptr') {
         return object;
       }
 
-      return MethodProxy(object, name);
+      return new MethodProxy(object, name);
     }
   });
 }
@@ -35,8 +33,8 @@ export function ObjCProxy(object) {
 export function MethodProxy(object, methodName) {
   return new Proxy(() => {}, {
     get: (target, name) => {
-      if (name == 'inspect') {
-        return (deps, opts) => `[objc.MethodProxy for ${methodName}]`;
+      if (name === 'inspect') {
+        return () => `[objc.MethodProxy for ${methodName}]`;
       }
     },
 
@@ -45,10 +43,10 @@ export function MethodProxy(object, methodName) {
       let returnType = object.returnTypeOfMethod(methodName);
 
       if (returnType === '@' && typeof retval === 'object') { // Why check for object type as well? Because some objects (like NSString, NSNumber, etc) are returned as native JS values
-        return ObjCProxy(retval);
-      } else {
-        return retval;
+        return new ObjCProxy(retval);
       }
+
+      return retval;
     }
   });
 }

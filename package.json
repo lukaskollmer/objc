@@ -15,7 +15,7 @@
   },
   "scripts": {
     "test": "xo && ava",
-    "compile": "babel --presets es2015,stage-0 -d lib/ src/",
+    "compile": "node-gyp build && babel --presets es2015,stage-0 -d lib/ src/",
     "start": "npm run compile && node example.js",
     "prepublish": "npm run compile"
   },
@@ -34,5 +34,9 @@
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-stage-0": "^6.24.1",
     "xo": "^0.17.0"
+  },
+  "xo": {
+    "space": true,
+    "ignore": "example.js"
   }
 }

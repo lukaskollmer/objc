@@ -1,24 +1,18 @@
 
-import * as runtime from './runtime.js';
-import {
-  ObjCProxy,
-  MethodProxy
-} from './Proxies.js';
-
-import ProxyType from './enums.js';
-
-runtime.importFramework('Foundation');
+import {ObjCProxy} from './proxies';
+import ProxyType from './enums';
+import * as runtime from './runtime';
 
 let binding = require('bindings')('objc.node');
 
-console.log(binding.ClassProxy);
+runtime.importFramework('Foundation');
 
 module.exports = new Proxy(() => {}, {
   get: (_, name) => {
     if (name in runtime) {
       return runtime[name];
-    } else {
-      return ObjCProxy(new binding.Proxy(ProxyType.class, name));
     }
+
+    return new ObjCProxy(new binding.Proxy(ProxyType.class, name));
   }
 });
