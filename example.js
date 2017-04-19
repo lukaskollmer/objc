@@ -2,19 +2,21 @@
 
 console.log('\n\n======================\n');
 
-const objc = require('./lib/index.js');
+const objc = require('./src/index.js');
 
 const {
-	NSProcessInfo
+	NSProcessInfo,
+	NSMutableString,
+	NSString,
+	NSData
 } = objc;
 
 
-console.log(NSProcessInfo.processInfo().environment());
+let username = NSProcessInfo.processInfo().userName();
+let str = NSMutableString.stringWithString_("Your username is: ");
+str.appendString_(username);
 
-//let processInfo = NSProcessInfo.call("processInfo");
-//let userName = processInfo.call("userName");
-//console.log('inst:', userName.description());
-//console.log(processInfo.call);
+console.log(str);
 
 
 console.log('\n======================\n\n');
