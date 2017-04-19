@@ -204,6 +204,27 @@ namespace ObjC {
 
                     invocation.SetArgumentAtIndex(&number, objcArgumentIndex);
                 } // TODO Convert array/dict as well?
+            } else if (EQUAL(expectedType, "#")) { // Class
+                // This will either take a proxy around a `Class` object or a string and convert that to the expected `Class` object
+                if (arg->IsString()) {
+                    const char *classname = ValueToChar(isolate, arg);
+                    Class cls = objc_getClass(classname);
+                    invocation.SetArgumentAtIndex(&cls, objcArgumentIndex);
+                } else if (arg->IsObject()) {
+                    Local<Object> wrappedObject = arg->ToObject()->Get(String::NewFromUtf8(isolate, "__ptr"))->ToObject();
+
+                    Proxy *passedClassProxy = ObjectWrap::Unwrap<Proxy>(wrappedObject);
+                    if (passedClassProxy != nullptr) {
+                        if (passedClassProxy->type_ == Type::klass) {
+                            Class cls = (Class)passedClassProxy->obj_;
+                            invocation.SetArgumentAtIndex(&cls, objcArgumentIndex);
+                        } else {
+                            // TODO ???
+                        }
+                    } else {
+                        // TODO pass nil?
+                    }
+                }
             }
         }
 
