@@ -83,7 +83,7 @@ let number = Number(age); // This is now a native JavaScript number
 ```
 
 ## TODO
-This isvery much still work in progress and there's a bunch of stuff that either doesn't work or still needs to be implemented:
+This is very much still work in progress and there's a bunch of stuff that either doesn't work or still needs to be implemented:
 - [ ] `NSDate` ⇆ `Date` conversion
 - [ ] `NSArray` enumeration
 - [ ] `NSDictionary` ⇆ `Object` conversion
