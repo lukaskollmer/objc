@@ -27,6 +27,11 @@ SEL resolveSelector(id target, const char *sel) {
     return sel_getUid(selector.c_str());
 }
 
+template< typename T >
+inline bool is_aligned( T*p, size_t n = alignof(T) ){
+    return 0 == reinterpret_cast<uintptr_t>(p) % n ;
+}
+
 
 #define HANDLE_RETURN_TYPE(type) \
     type retval; \
@@ -314,6 +319,11 @@ namespace ObjC {
             }
 
             // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
+
+            if (!is_aligned(retval)) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Internal Error: Unable to align pointer")));
+                return;
+            }
 
             Local<Object> object = TemplateObject->NewInstance();
             object->SetAlignedPointerInInternalField(0, retval);
