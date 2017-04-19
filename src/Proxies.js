@@ -6,8 +6,8 @@ export function ObjCProxy(object) {
     get: (target, name) => {
       if (name === Symbol.toPrimitive) { // this is called for string substitutions like `obj: ${obj}`
         return (hint) => {
-          let type = target.type() == 0 ? 'Class' : 'Instance';
-          return `[objc.${type}Proxy ${target.description()}]`;
+          console.log(`ToPrimitive: ${hint}`);
+          return target.description();
         }
       }
 
@@ -17,6 +17,10 @@ export function ObjCProxy(object) {
           let type = target.type() == 0 ? 'Class' : 'Instance';
           return `[objc.${type}Proxy ${target.description()}]`;
         };
+      }
+
+      if (name === "__ptr") {
+        return object;
       }
 
       return MethodProxy(object, name);
@@ -33,7 +37,7 @@ export function MethodProxy(object, methodName) {
     },
 
     apply: (target, thisArg, argv) => {
-      let retval = object.call(methodName);
+      let retval = object.call(methodName, ...argv);
       let returnType = object.returnTypeOfMethod(methodName);
 
       if (returnType === '@' && typeof retval === 'object') { // Why check for object type as well? Because some objects (like NSString, NSNumber, etc) are returned as native JS values

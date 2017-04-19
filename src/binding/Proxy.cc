@@ -3,15 +3,44 @@
 //
 
 #include <node.h>
+#include <string>
+#include <iostream>
+#include <mach-o/dyld.h>
+#include <array>
 #include "Proxy.h"
 #include "objc_call.h"
 
+#include "Invocation.h"
 #include "utils.h"
 
 extern "C" {
 #include <objc/message.h>
 #include <objc/runtime.h>
 }
+
+
+SEL resolveSelector(id target, const char *sel) {
+    std::string selector(sel);
+
+    std::replace(selector.begin(), selector.end(), '_', ':'); // TODO make this smart and support methods that include an unserscore
+    return sel_getUid(selector.c_str());
+}
+
+
+#define HANDLE_RETURN_TYPE(type) \
+    type retval; \
+    invocation.GetReturnValue(&retval); \
+    args.GetReturnValue().Set(retval); \
+    return; \
+
+#define HANDLE_RETURN_TYPE_CAST(type, castType) \
+    type retval; \
+    invocation.GetReturnValue(&retval); \
+    args.GetReturnValue().Set((castType)retval); \
+    return; \
+
+
+
 
 using namespace v8;
 
@@ -42,8 +71,6 @@ namespace ObjC {
 
 
     void Proxy::New(const FunctionCallbackInfo<Value>& args) {
-        //printf("%s\n", __PRETTY_FUNCTION__);
-
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
 
@@ -101,43 +128,106 @@ namespace ObjC {
 
     }
 
-#define UNSUPPORTED_RETURN_TYPE(type) \
-    char *excMessage; \
-    asprintf(&excMessage, "Return type '%s'not yet supported", returnType); \
-    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage))); \
-    free(excMessage); \
-
     void Proxy::Call(const FunctionCallbackInfo<Value>& args) {
-        //printf("%s\n", __PRETTY_FUNCTION__);
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
 
-        const char *sel = ValueToChar(isolate, args[0]);
+        Local<ObjectTemplate> TemplateObject = ObjectTemplate::New();
+        TemplateObject->SetInternalFieldCount(1);
+
+
 
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
 
-
-        // arguments TODO
-
-        //int argc = args.Length() - 1; // 1st arg is selector
-        //for (int i = 1; i <= argc; ++i) {
-        //    printf("#arg: %i %p\n", i, args[i]);
-        //}
+        SEL sel = resolveSelector(obj->obj_, ValueToChar(isolate, args[0]));
 
         Method method;
 
         switch (obj->type_) {
-            case Type::klass: method = class_getClassMethod((Class)obj->obj_, sel_getUid(sel)); break;
-            case Type::instance: method = class_getInstanceMethod(object_getClass(obj->obj_), sel_getUid(sel)); break;
+            case Type::klass: method = class_getClassMethod((Class)obj->obj_, sel); break;
+            case Type::instance: method = class_getInstanceMethod(object_getClass(obj->obj_), sel); break;
         }
 
 
-        char *returnType = method_copyReturnType(method);
+        auto invocation = ObjC::Invocation(obj->obj_, sel);
+        invocation.SetTarget(obj->obj_);
+        invocation.SetSelector(sel);
+
+
+        for (int i = 1; i < args.Length(); ++i) {
+            int objcArgumentIndex = i + 1; // +1 bc we already start at 1
+
+            auto expectedType = method_copyArgumentType(method, (unsigned int) objcArgumentIndex);
+            Local<Value> arg = args[i];
+
+            if (arg->IsNull() || arg->IsUndefined()) {
+                void* nilArgument = nullptr;
+                invocation.SetArgumentAtIndex(&nilArgument, objcArgumentIndex);
+                continue;
+            }
+
+
+            if (EQUAL(expectedType, "@")) {
+                // 1. check if a wrapped object was passed
+                if (arg->IsObject()) {
+                    // args[i] is the JS Proxy type, we have to fetch the actual ObjC::Proxy wrapper via __ptr
+                    Local<Object> wrappedObject = arg->ToObject()->Get(String::NewFromUtf8(isolate, "__ptr"))->ToObject();
+
+                    Proxy *passedProxy = ObjectWrap::Unwrap<Proxy>(wrappedObject);
+                    if (passedProxy != nullptr) {
+                        id argument = passedProxy->obj_;
+                        invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
+                        continue;
+                    } else {
+                        // TODO set nil as arg
+                    }
+                // 2. if no wrapped object was passed, but a native type (string, number, bool), convert that
+                } else if (arg->IsString()) {
+                    const char* stringValue = ValueToChar(isolate, arg);
+
+                    id NSString = (id)objc_getClass("NSString");
+                    id string = objc_call(id, NSString, "stringWithUTF8String:", stringValue);
+
+                    invocation.SetArgumentAtIndex(&string, objcArgumentIndex);
+                } else if (arg->IsNumber()) {
+                    double numberValue = arg->ToNumber()->Value();
+
+                    id NSNumber = (id)objc_getClass("NSNumber");
+                    id number = objc_call(id, NSNumber, "numberWithDouble:", numberValue);
+
+                    invocation.SetArgumentAtIndex(&number, objcArgumentIndex);
+                } else if (arg->IsBoolean()) {
+                    bool boolValue = arg->ToBoolean()->Value();
+
+                    id NSNumber = (id)objc_getClass("NSNumber");
+                    id number = objc_call(id, NSNumber, "numberWithBool:", boolValue);
+
+                    invocation.SetArgumentAtIndex(&number, objcArgumentIndex);
+                } // TODO Convert array/dict as well?
+            }
+        }
+
+
+        //
+        // Invoke
+        //
+
+        invocation.Invoke();
+
+
+
+        //
+        // Handle return value
+        //
+
+        const char *returnType = method_copyReturnType(method);
 
         if (EQUAL(returnType, "@")) {
-            id retval = objc_call(id, obj->obj_, sel);
+            id retval;
+            invocation.GetReturnValue(&retval);
 
             auto isKindOfClass = [](id object, const char *classname) -> bool {
+                return false; // TODO Re-enable this
                 return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
             };
 
@@ -154,103 +244,70 @@ namespace ObjC {
             }
 
             // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
-            // NSData -> Buffer???
-
-
-            Local<ObjectTemplate> TemplateObject = ObjectTemplate::New();
-            TemplateObject->SetInternalFieldCount(1);
 
             Local<Object> object = TemplateObject->NewInstance();
             object->SetAlignedPointerInInternalField(0, retval);
+            // TODO ^^ This sometimes crashes w/ a "pointer not aligned" error message (seems to happem at random, try to fix eventually)
 
             const unsigned argc = 2;
             Local<Value> argv[argc] = {Number::New(isolate, 1), object};
             Local<Function> cons = Local<Function>::New(isolate, constructor);
             Local<Context> context = isolate->GetCurrentContext();
-            Local<Object> instance =
-                    cons->NewInstance(context, argc, argv).ToLocalChecked();
-
+            Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
             args.GetReturnValue().Set(instance);
             return;
         } else if (EQUAL(returnType, "c")) { // char
-            UNSUPPORTED_RETURN_TYPE(returnType);
-            return;
+            HANDLE_RETURN_TYPE(char);
         } else if (EQUAL(returnType, "i")) { // int
-            int retval = objc_call(int, obj->obj_, sel);
-            args.GetReturnValue().Set(retval);
-            return;
+            HANDLE_RETURN_TYPE(int);
         } else if (EQUAL(returnType, "s")) { // short
-            UNSUPPORTED_RETURN_TYPE(returnType);
-            return;
-        } else if (EQUAL(returnType, "l")) { // A longl is treated as a 32-bit quantity on 64-bit programs
-            UNSUPPORTED_RETURN_TYPE(returnType);
-            return;
+            HANDLE_RETURN_TYPE(short);
         } else if (EQUAL(returnType, "q")) { // long long
-            long long retval = objc_call(long long, obj->obj_, sel);
-            args.GetReturnValue().Set((double)retval);
-            return;
+            HANDLE_RETURN_TYPE_CAST(long long, int32_t);
         } else if (EQUAL(returnType, "C")) { // unsigned char
-            UNSUPPORTED_RETURN_TYPE(returnType);
-            return;
+            HANDLE_RETURN_TYPE(unsigned char);
         } else if (EQUAL(returnType, "I")) { // unsigned int
-            unsigned int retval = objc_call(unsigned int, obj->obj_, sel);
-            args.GetReturnValue().Set((double)retval);
-            return;
+            HANDLE_RETURN_TYPE(unsigned int);
         } else if (EQUAL(returnType, "S")) { // unsigned short
-            unsigned short retval = objc_call(unsigned short, obj->obj_, sel);
-            args.GetReturnValue().Set(retval);
-            return;
+            HANDLE_RETURN_TYPE(unsigned short);
+        } else if (EQUAL(returnType, "L")) { // unsigned long
         } else if (EQUAL(returnType, "Q")) { // unsigned long long
-            unsigned long long retval = objc_call(unsigned long long, obj->obj_, sel);
-            args.GetReturnValue().Set((double) retval);
-            return;
+            HANDLE_RETURN_TYPE_CAST(unsigned long long, int32_t);
         } else if (EQUAL(returnType, "f")) { // float
-            float retval = objc_call(float, obj->obj_, sel);
-            args.GetReturnValue().Set(retval);
-            return;
+            HANDLE_RETURN_TYPE(float);
         } else if (EQUAL(returnType, "d")) { // double
-            double retval = objc_call(double, obj->obj_, sel);
-            args.GetReturnValue().Set(retval);
-            return;
+            HANDLE_RETURN_TYPE(double);
         } else if (EQUAL(returnType, "B")) { // bool
-            bool retval = objc_call(bool, obj->obj_, sel);
-            args.GetReturnValue().Set(retval);
-            return;
+            HANDLE_RETURN_TYPE(bool);
+            //void* retval;
+            //invocation.GetReturnValue(&retval);
+            //args.GetReturnValue().Set((bool)retval);
+            //return;
         } else if (EQUAL(returnType, "v")) { // void
-            // Custom cast because the macro would attempt to initialize a variable to type void, which would fail
-            void (*msgSend_void)(id, SEL, ...) = (void (*) (id, SEL, ...)) objc_msgSend;
-            msgSend_void(obj->obj_, sel_getUid(sel));
             args.GetReturnValue().Set(Undefined(isolate));
-            return;
-        } else if (EQUAL(returnType, "*")) { // char *
-            char* retval = objc_call(char*, obj->obj_, sel);
-            args.GetReturnValue().Set(String::NewFromUtf8(isolate, retval));
+        } else if (EQUAL(returnType, "*")) { // char*
+            char* retval;
+            invocation.GetReturnValue(&retval);
+            Local<Value>  string = String::NewFromUtf8(isolate, retval);
+            args.GetReturnValue().Set(string);
             return;
         } else if (EQUAL(returnType, "#")) { // Class
-            UNSUPPORTED_RETURN_TYPE(returnType);
-            // TODO return class wrapper
-            return;
+            // TODO
+            args.GetReturnValue().Set(Undefined(isolate));
         } else if (EQUAL(returnType, ":")) { // SEL
-            UNSUPPORTED_RETURN_TYPE(returnType);
-            // TOOD ¯\_(ツ)_/¯
-            return;
-        } else {
-            char *excMessage;
-            asprintf(&excMessage, "Unknown return type '%s' on +[%s %s]", returnType, class_getName(object_getClass(obj->obj_)), sel);
-            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage)));
-            free(excMessage);
-            return;
+            // TODO
+            args.GetReturnValue().Set(Undefined(isolate));
         }
+
+        return;
     }
 
     void Proxy::ReturnTypeOfMethod(const FunctionCallbackInfo<Value> &args) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
 
-        SEL sel = sel_getUid(ValueToChar(isolate, args[0]));
-
-
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
+        SEL sel = resolveSelector(obj->obj_, ValueToChar(isolate, args[0]));
 
         Method method;
 
@@ -262,7 +319,5 @@ namespace ObjC {
         const char *returnType = method_copyReturnType(method);
 
         args.GetReturnValue().Set(String::NewFromUtf8(isolate, returnType));
-
-
     }
 }
