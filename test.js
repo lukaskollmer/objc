@@ -16,6 +16,16 @@ test('primitive return values', t => {
   t.is(typeof length, 'number');
 });
 
+test('get username using NSProcessInfo, convert to javascript string and compare the value to the username given by `os.userInfo()`', t => {
+  const NSProcessInfo = objc.NSProcessInfo;
+  const os = require('os');
+
+  let processInfo = NSProcessInfo.processInfo();
+  let username = processInfo.userName();
+
+  t.is(String(username), os.userInfo().username);
+});
+
 test('primitive argument types', t => {
   const NSNumber = objc.NSNumber;
 
