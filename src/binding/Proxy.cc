@@ -242,6 +242,7 @@ namespace ObjC {
         //
 
         const char *returnType = method_copyReturnType(method);
+        //printf("%s - %s\n", returnType, sel_getName(sel));
 
         if (EQUAL(returnType, "@")) {
             id retval;
@@ -306,10 +307,10 @@ namespace ObjC {
             //return;
         } else if (EQUAL(returnType, "v")) { // void
             args.GetReturnValue().Set(Undefined(isolate));
-        } else if (EQUAL(returnType, "*")) { // char*
+        } else if (EQUAL(returnType, "*") || EQUAL(returnType, "r*")) { // char*, const char*
             char* retval;
             invocation.GetReturnValue(&retval);
-            Local<Value>  string = String::NewFromUtf8(isolate, retval);
+            Local<Value> string = String::NewFromUtf8(isolate, retval);
             args.GetReturnValue().Set(string);
             return;
         } else if (EQUAL(returnType, "#")) { // Class
