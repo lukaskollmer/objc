@@ -5,11 +5,8 @@
 #include <node.h>
 #include <string>
 #include <iostream>
-#include <mach-o/dyld.h>
-#include <array>
 #include "Proxy.h"
 #include "objc_call.h"
-#include <typeinfo>
 
 #include "Invocation.h"
 #include "utils.h"
