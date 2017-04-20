@@ -11,14 +11,17 @@
   },
   "main": "./src/index.js",
   "engines": {
-    "node": ">=4"
+    "node": ">=6"
   },
   "scripts": {
     "test": "xo && ava --verbose",
     "start": "node-gyp build && node example.js"
   },
   "keywords": [
-    "objc"
+    "objc",
+    "Objective-C",
+    "bridge",
+    "runtime"
   ],
   "dependencies": {
     "bindings": "^1.2.1",
