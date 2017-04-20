@@ -18,6 +18,9 @@ str.appendString_(username);
 
 console.log(str);
 
+let str2 = objc("Hello moto");
+console.log(str2);
+
 
 console.log('\n======================\n\n');
 
