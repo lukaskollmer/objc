@@ -45,10 +45,18 @@ Load an Objective-C class simply by accessing it as a property of `objc`. This w
 Check if a class named `name` is registered with the Objective-C runtime;
 
 
-### Calling methods
+#### `objc.constant(name, [bundleId])`
+Load a constant at runtime. This will only work for `NSString*` constants.
 
-**Method calling convention:**
-To call an Objective-C method, just call that method on the proxy object. You need to replace all colons (`:`) in the method name with underscores (`_`);
+**Note:**
+The second argument is not required, but increases performance a lot, since we don't have to look into each bundle (~20ms vs ~0.06ms)
+```js
+objc.constant('NSFontAttributeName', 'com.apple.AppKit'); // -> 'NSFont'
+```
+
+
+### Calling methods
+To call an Objective-C method, just call that method on the proxy object. You need to replace all colons in the method name with underscores:
 ```js
 let NSString = objc.NSString;
 
