@@ -46,8 +46,7 @@ Check if a class named `name` is registered with the Objective-C runtime;
 
 
 #### `objc.constant(name, [bundleId])`
-Load a constant at runtime. This will only work for `NSString*` constants.
-
+Load a constant at runtime. This will only work for `NSString*` constants.  
 **Note:**
 The second argument is not required, but increases performance a lot, since we don't have to look into each bundle (~20ms vs ~0.06ms)
 ```js
