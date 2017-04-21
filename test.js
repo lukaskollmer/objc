@@ -16,16 +16,23 @@ test('primitive return values', t => {
   t.is(typeof length, 'number');
 });
 
-test('load constant w/ bundle', t => {
+test('load constant w/out bundle', t => {
   objc.import('AppKit');
-  let NSFontAttributeName = objc.constant('NSFontAttributeName', 'com.apple.AppKit');
+  let NSFontAttributeName = objc.constant('NSFontAttributeName');
 
   t.is(NSFontAttributeName, 'NSFont');
 });
 
-test('load constant w/out bundle', t => {
+test('load constant w/ bundle', t => {
   objc.import('AppKit');
-  let NSFontAttributeName = objc.constant('NSFontAttributeName');
+  let NSFontAttributeName = objc.constant('NSFontAttributeName', 'AppKit');
+
+  t.is(NSFontAttributeName, 'NSFont');
+});
+
+test('load constant w/ full bundle name', t => {
+  objc.import('AppKit');
+  let NSFontAttributeName = objc.constant('NSFontAttributeName', 'com.apple.AppKit');
 
   t.is(NSFontAttributeName, 'NSFont');
 });

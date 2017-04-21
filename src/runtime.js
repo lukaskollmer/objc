@@ -21,7 +21,7 @@ module.exports = {
   },
 
   constant: (name, bundle) => {
-    if (!bundle.startsWith('com.apple.')) {
+    if (typeof bundle === 'string' && !bundle.startsWith('com.apple.')) {
       bundle = 'com.apple.' + bundle;
     }
     return binding.constant(name, bundle);
