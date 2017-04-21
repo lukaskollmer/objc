@@ -7,10 +7,9 @@ objc.import('AppKit');
 const {
   NSPasteboard,
   NSString,
-  NSArray
+  NSArray,
+  NSPasteboardTypeString
 } = objc;
-
-const NSPasteboardTypeString = objc.constant('NSPasteboardTypeString', 'AppKit');
 
 let pasteboard = NSPasteboard.generalPasteboard();
 pasteboard.declareTypes_owner_(NSArray.arrayWithObject_(NSPasteboardTypeString), null);

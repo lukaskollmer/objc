@@ -13,7 +13,11 @@ module.exports = new Proxy(() => {}, {
       return runtime[name];
     }
 
-    return new ObjCProxy(new binding.Proxy(ProxyType.class, name));
+    if (runtime.classExists(name)) {
+      return new ObjCProxy(new binding.Proxy(ProxyType.class, name));
+    }
+
+    return runtime.constant(name);
   },
 
   apply: (target, thisArg, argv) => {

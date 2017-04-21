@@ -1,5 +1,6 @@
 
 const ffi = require('ffi');
+const ref = require('ref');
 const binding = require('bindings')('objc.node');
 
 const libobjc = new ffi.Library('libobjc', {
@@ -12,7 +13,8 @@ module.exports = {
   },
 
   classExists: name => {
-    return module.exports.getClass(name) !== null;
+    let classPtr = libobjc.objc_getClass(name);
+    return classPtr !== null && classPtr.address() !== 0;
   },
 
   import: name => {
