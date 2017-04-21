@@ -21,6 +21,16 @@ console.log(str);
 let str2 = objc("Hello moto");
 console.log(str2);
 
+objc.import('AppKit');
+
+console.time('noname');
+console.log(objc.constant('NSFontAttributeName'));
+console.timeEnd('noname');
+
+console.time('name');
+console.log(objc.constant('NSFontAttributeName', 'com.apple.AppKit'));
+console.timeEnd('name');
+
 
 console.log('\n======================\n\n');
 

@@ -16,6 +16,20 @@ test('primitive return values', t => {
   t.is(typeof length, 'number');
 });
 
+test('load constant w/ bundle', t => {
+  objc.import('AppKit');
+  let NSFontAttributeName = objc.constant('NSFontAttributeName', 'com.apple.AppKit');
+
+  t.is(NSFontAttributeName, 'NSFont');
+});
+
+test('load constant w/out bundle', t => {
+  objc.import('AppKit');
+  let NSFontAttributeName = objc.constant('NSFontAttributeName');
+
+  t.is(NSFontAttributeName, 'NSFont');
+});
+
 test.skip('get username using NSProcessInfo, convert to javascript string and compare the value to the username given by `os.userInfo()`', t => { // eslint-disable-line ava/no-skip-test
   const NSProcessInfo = objc.NSProcessInfo;
   const os = require('os');
