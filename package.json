@@ -37,6 +37,6 @@
   },
   "xo": {
     "space": true,
-    "ignore": "example.js"
+    "ignore": "examples/*"
   }
 }
