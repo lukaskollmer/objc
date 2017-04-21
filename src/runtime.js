@@ -1,6 +1,6 @@
 
 const ffi = require('ffi');
-require('ref');
+require('ref'); // eslint-disable-line import/no-unassigned-import
 const binding = require('bindings')('objc.node');
 
 const libobjc = new ffi.Library('libobjc', {
