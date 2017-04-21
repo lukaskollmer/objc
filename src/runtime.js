@@ -1,6 +1,6 @@
 
 const ffi = require('ffi');
-const ref = require('ref');
+require('ref');
 const binding = require('bindings')('objc.node');
 
 const libobjc = new ffi.Library('libobjc', {
