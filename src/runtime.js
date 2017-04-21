@@ -21,6 +21,9 @@ module.exports = {
   },
 
   constant: (name, bundle) => {
+    if (!bundle.startsWith('com.apple.')) {
+      bundle = 'com.apple.' + bundle;
+    }
     return binding.constant(name, bundle);
   }
 };
