@@ -46,12 +46,13 @@ Check if a class named `name` is registered with the Objective-C runtime;
 
 
 #### `objc.constant(name, [bundleId])`
-Load a constant at runtime. This will only work for `NSString*` constants.
+Load a constant at runtime. This will only work for `NSString *` constants. You can also load a constant by accessing it directly on the `objc` module, the same way you'd load a class.
 
 **Note:**
-The second argument is not required, but increases performance a lot, since we don't have to look into each bundle (~20ms vs ~0.06ms)
+Even though calling this function to is not required to load a constant, it's still the recommended way, because you can specify the bundle to load the constant from. This increases performance a lot (400x), since we don't have to iterate over all loaded bundles looking for the constant.
 ```js
-objc.constant('NSFontAttributeName', 'AppKit'); // -> 'NSFont'
+objc.NSFontAttributeName; // -> 'NSFont'                         (~20ms)
+objc.constant('NSFontAttributeName', 'AppKit'); // -> 'NSFont'   (~0.05ms)
 ```
 
 
