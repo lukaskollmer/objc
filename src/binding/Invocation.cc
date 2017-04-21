@@ -2,26 +2,10 @@
 // Created by Lukas Kollmer on 18.04.17.
 //
 
-#include <cstdlib>
 #include "Invocation.h"
-
-extern "C" {
-#include <objc/message.h>
-}
+#include "objc_call.h"
 
 
-#define objc_call(returnType, target, sel, ...) \
-    ({ \
-        returnType (*___fn)(id, SEL, ...) = (returnType (*) (id, SEL, ...)) objc_msgSend; \
-        returnType ___retval = ___fn(target, sel_getUid(sel), ##__VA_ARGS__); \
-        ___retval; \
-    }) \
-
-#define objc_call_noreturn(returnType, target, sel, ...) \
-    ({ \
-        returnType (*___fn)(id, SEL, ...) = (returnType (*) (id, SEL, ...)) objc_msgSend; \
-        ___fn(target, sel_getUid(sel), ##__VA_ARGS__); \
-    }) \
 
 const char *ObjC::description(id object, bool debug) {
     const char *sel = debug ? "debugDescription" : "description";

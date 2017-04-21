@@ -11,10 +11,6 @@
 #include "Invocation.h"
 #include "utils.h"
 
-extern "C" {
-#include <objc/message.h>
-#include <objc/runtime.h>
-}
 
 
 SEL resolveSelector(id target, const char *sel) {
