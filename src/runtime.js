@@ -2,6 +2,7 @@
 const ffi = require('ffi');
 require('ref'); // eslint-disable-line import/no-unassigned-import
 const binding = require('bindings')('objc.node');
+const ObjCProxy = require('./proxies').ObjCProxy;
 
 const libobjc = new ffi.Library('libobjc', {
   objc_getClass: ['pointer', ['string']] // eslint-disable-line camelcase
@@ -27,5 +28,19 @@ module.exports = {
       bundle = 'com.apple.' + bundle;
     }
     return binding.constant(name, bundle);
+  },
+
+  ref: object => {
+    return {ref: object};
+  },
+
+  deref: object => {
+    let ref = object.ref;
+
+    if (typeof ref === 'undefined') {
+      return undefined;
+    }
+
+    return new ObjCProxy(object.ref);
   }
 };

@@ -1,30 +1,39 @@
 function ObjCProxy(object) {
+  let pointer = object;
   return new Proxy(object, {
     get: (target, name) => {
       if (name === Symbol.toPrimitive) { // this is called for string substitutions like `obj: ${obj}`
         return hint => {
-          if (hint === 'string' && target.call('isKindOfClass:', 'NSString')) { // NSMutableString
-            return target.call('UTF8String');
-          } else if (hint === 'number' && target.call('isKindOfClass:', 'NSNumber')) {
-            return target.call('doubleValue');
+          if (hint === 'string' && pointer.call('isKindOfClass:', 'NSString')) { // NSMutableString
+            return pointer.call('UTF8String');
+          } else if (hint === 'number' && pointer.call('isKindOfClass:', 'NSNumber')) {
+            return pointer.call('doubleValue');
           }
-          return target.description();
+          return pointer.description();
         };
       }
 
       name = String(name);
       if (name === 'Symbol(util.inspect.custom)') {
         return () => {
-          let type = target.type() === 0 ? 'Class' : 'Instance';
-          return `[objc.${type}Proxy ${target.description()}]`;
+          let type = pointer.type() === 0 ? 'Class' : 'Instance';
+          return `[objc.${type}Proxy ${pointer.description()}]`;
         };
       }
 
       if (name === '__ptr') {
-        return object;
+        console.log('will return ptr');
+        return pointer;
       }
 
-      return new MethodProxy(object, name);
+      return new MethodProxy(pointer, name);
+    },
+
+    set: (target, key, value) => {
+      console.log(`Will set ${key} to ${value}`);
+      if (key === '__ptr') {
+        pointer = value;
+      }
     }
   });
 }
@@ -45,7 +54,12 @@ function MethodProxy(object, methodName) {
         return new ObjCProxy(retval);
       }
 
-      return retval;
+      // Problem: objc BOOLs are encoded as char (c). this means that the c++ binding will never cast the return value to a BOOL.
+      // We could simply convert all chars to JavaScript Booleans here, but that might not be a good idea bc it would also convert non-boolean chars. However, that probably wouldn't be a problem at all, since I don't know of a single objc method that returns a 'char'
+      switch (returnType) {
+        case 'c': return Boolean(retval);
+        default: return retval;
+      }
     }
   });
 }

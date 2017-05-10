@@ -5,6 +5,7 @@
 #include <node.h>
 #include <string>
 #include <iostream>
+#include <set>
 #include "Proxy.h"
 #include "objc_call.h"
 
@@ -140,7 +141,29 @@ namespace ObjC {
         Local<ObjectTemplate> TemplateObject = ObjectTemplate::New();
         TemplateObject->SetInternalFieldCount(1);
 
+        Local<String> __ptr_key = String::NewFromUtf8(isolate, "__ptr");
+        Local<String> __ref_key = String::NewFromUtf8(isolate, "ref");
 
+
+        // Wrap an `id` in a `ObjC::Proxy` in a `Local<Object>` that can be returned by v8
+        auto CreateNewObjCWrapperFrom = [&](id obj) -> Local<Object> {
+            if (!is_aligned(obj)) {
+                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Internal Error: Unable to align pointer")));
+                return Undefined(isolate)->ToObject();
+            }
+
+            Local<Object> object = TemplateObject->NewInstance();
+            object->SetAlignedPointerInInternalField(0, obj);
+            // TODO ^^ This sometimes crashes w/ a "pointer not aligned" error message (seems to happen at random, should try to fix eventually)
+
+            const unsigned argc = 2;
+            Local<Value> argv[argc] = {Number::New(isolate, 1), object};
+            Local<Function> cons = Local<Function>::New(isolate, constructor);
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
+
+            return instance;
+        };
 
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
 
@@ -160,6 +183,9 @@ namespace ObjC {
         invocation.SetTarget(obj->obj_);
         invocation.SetSelector(sel);
 
+        // The argument indexes of all inout arguments (^@)
+        std::set<int> inoutArgs;
+
 
         for (int i = 1; i < args.Length(); ++i) {
             int objcArgumentIndex = i + 1; // +1 bc we already start at 1
@@ -167,18 +193,41 @@ namespace ObjC {
             auto expectedType = method_copyArgumentType(method, (unsigned int) objcArgumentIndex);
             Local<Value> arg = args[i];
 
+            //printf("arg #%i expects %s\n", i, expectedType);
+
             if (arg->IsNull() || arg->IsUndefined()) {
                 void* nilArgument = nullptr;
                 invocation.SetArgumentAtIndex(&nilArgument, objcArgumentIndex);
                 continue;
             }
 
+            if (EQUAL(expectedType, "^@")) { // inout object
+                printf("did pass inout object at index %i\n", objcArgumentIndex);
+                inoutArgs.insert(objcArgumentIndex);
+            }
 
-            if (EQUAL(expectedType, "@")) {
+
+            if (EQUAL(expectedType, "@") || EQUAL(expectedType, "^@")) {
                 // 1. check if a wrapped object was passed
                 if (arg->IsObject()) {
-                    // args[i] is the JS Proxy type, we have to fetch the actual ObjC::Proxy wrapper via __ptr
-                    Local<Object> wrappedObject = arg->ToObject()->Get(String::NewFromUtf8(isolate, "__ptr"))->ToObject();
+                    Local<Object> wrappedObject;
+
+
+                    if (EQUAL(expectedType, "@")) {
+                        // args[i] is the JS Proxy type, we have to fetch the actual ObjC::Proxy wrapper via __ptr
+                        wrappedObject = arg->ToObject()->Get(__ptr_key)->ToObject();
+                    } else if (EQUAL(expectedType, "^@")) {
+                        auto wrappedProxy = arg->ToObject()->Get(__ref_key);
+                        auto proxyIsNull = wrappedProxy->IsUndefined() || wrappedProxy->IsNull();
+
+                        if (proxyIsNull) {
+                            id _nullptr = (id)malloc(sizeof(id));
+                            invocation.SetArgumentAtIndex(&_nullptr, objcArgumentIndex);
+                            continue;
+                        } else {
+                            wrappedObject = arg->ToObject()->Get(__ref_key)->ToObject()->Get(__ptr_key)->ToObject();
+                        }
+                    }
 
                     Proxy *passedProxy = ObjectWrap::Unwrap<Proxy>(wrappedObject);
                     if (passedProxy != nullptr) {
@@ -287,11 +336,32 @@ namespace ObjC {
 
 
         //
+        // Handle inout args
+        //
+
+        for (auto &&objcArgumentIndex : inoutArgs) {
+            int javaScriptArgumentIndex = objcArgumentIndex - 1; // 0 is the method name
+
+            id *arg = (id *)malloc(sizeof(id));
+            invocation.GetArgumentAtIndex(&arg, objcArgumentIndex);
+            id unwrappedArg = *arg;
+
+            if (unwrappedArg != nil) {
+                auto wrappedValue = CreateNewObjCWrapperFrom(unwrappedArg);
+                args[javaScriptArgumentIndex]->ToObject()->Set(__ref_key, wrappedValue);
+            } else {
+                // TODO test this
+                args[javaScriptArgumentIndex]->ToObject()->Set(__ref_key, Undefined(isolate));
+            }
+        }
+
+
+        //
         // Handle return value
         //
 
         const char *returnType = method_copyReturnType(method);
-        //printf("%s - %s\n", returnType, sel_getName(sel));
+        printf("%s - %s\n", returnType, sel_getName(sel));
 
         if (EQUAL(returnType, "@")) {
             id retval;
@@ -316,23 +386,10 @@ namespace ObjC {
 
             // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
 
-            if (!is_aligned(retval)) {
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Internal Error: Unable to align pointer")));
-                return;
-            }
-
-            Local<Object> object = TemplateObject->NewInstance();
-            object->SetAlignedPointerInInternalField(0, retval);
-            // TODO ^^ This sometimes crashes w/ a "pointer not aligned" error message (seems to happem at random, try to fix eventually)
-
-            const unsigned argc = 2;
-            Local<Value> argv[argc] = {Number::New(isolate, 1), object};
-            Local<Function> cons = Local<Function>::New(isolate, constructor);
-            Local<Context> context = isolate->GetCurrentContext();
-            Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-            args.GetReturnValue().Set(instance);
+            args.GetReturnValue().Set(CreateNewObjCWrapperFrom(retval));
             return;
         } else if (EQUAL(returnType, "c")) { // char
+            // Fun Fact: ObjC BOOLs are encoded as char https://developer.apple.com/reference/objectivec/bool?language=objc
             HANDLE_RETURN_TYPE(char);
         } else if (EQUAL(returnType, "i")) { // int
             HANDLE_RETURN_TYPE(int);
@@ -355,7 +412,8 @@ namespace ObjC {
         } else if (EQUAL(returnType, "d")) { // double
             HANDLE_RETURN_TYPE(double);
         } else if (EQUAL(returnType, "B")) { // bool
-            HANDLE_RETURN_TYPE(bool);
+            printf("BOOL\n");
+            HANDLE_RETURN_TYPE(BOOL);
             //void* retval;
             //invocation.GetReturnValue(&retval);
             //args.GetReturnValue().Set((bool)retval);
