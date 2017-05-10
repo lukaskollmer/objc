@@ -55,3 +55,23 @@ test.skip('primitive argument types', t => { // eslint-disable-line ava/no-skip-
 
   t.is(Number(number), 5);
 });
+
+test('inout parameters (^@)', t => {
+  const NSFileManager = objc.NSFileManager;
+  let fm = NSFileManager.defaultManager();
+
+  const filepath = '/Library/Caches/randomfilenamethatsurelydoesntexust.hey';
+  fm.createFileAtPath_contents_attributes_(filepath, null, null);
+
+  let error1 = objc.ref(null);
+  let success1 = fm.removeItemAtPath_error_(filepath, error1);
+
+  t.is(success1, true);
+  t.is(typeof objc.deref(error1), 'undefined');
+
+  let error2 = objc.ref(null);
+  let success2 = fm.removeItemAtPath_error_(filepath, error2);
+
+  t.is(success2, false);
+  t.is(typeof objc.deref(error2), 'object');
+});
