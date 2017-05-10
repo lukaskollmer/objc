@@ -350,7 +350,7 @@ namespace ObjC {
                 args[javaScriptArgumentIndex]->ToObject()->Set(__ref_key, wrappedValue);
             } else {
                 // TODO test this
-                args[javaScriptArgumentIndex]->ToObject()->Set(__ref_key, Undefined(isolate));
+                args[javaScriptArgumentIndex]->ToObject()->Set(__ref_key, Undefined(isolate)); // TODO set Null instead
             }
         }
 
