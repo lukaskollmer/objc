@@ -202,7 +202,6 @@ namespace ObjC {
             }
 
             if (EQUAL(expectedType, "^@")) { // inout object
-                printf("did pass inout object at index %i\n", objcArgumentIndex);
                 inoutArgs.insert(objcArgumentIndex);
             }
 
@@ -361,7 +360,7 @@ namespace ObjC {
         //
 
         const char *returnType = method_copyReturnType(method);
-        printf("%s - %s\n", returnType, sel_getName(sel));
+        //printf("%s - %s\n", returnType, sel_getName(sel));
 
         if (EQUAL(returnType, "@")) {
             id retval;
@@ -412,12 +411,7 @@ namespace ObjC {
         } else if (EQUAL(returnType, "d")) { // double
             HANDLE_RETURN_TYPE(double);
         } else if (EQUAL(returnType, "B")) { // bool
-            printf("BOOL\n");
             HANDLE_RETURN_TYPE(BOOL);
-            //void* retval;
-            //invocation.GetReturnValue(&retval);
-            //args.GetReturnValue().Set((bool)retval);
-            //return;
         } else if (EQUAL(returnType, "v")) { // void
             args.GetReturnValue().Set(Undefined(isolate));
         } else if (EQUAL(returnType, "*") || EQUAL(returnType, "r*")) { // char*, const char*

@@ -56,7 +56,7 @@ test.skip('primitive argument types', t => { // eslint-disable-line ava/no-skip-
   t.is(Number(number), 5);
 });
 
-test('inout parameters (^@)', t => {
+test('inout parameters 1 (^@)', t => {
   const NSFileManager = objc.NSFileManager;
   let fm = NSFileManager.defaultManager();
 
@@ -74,4 +74,18 @@ test('inout parameters (^@)', t => {
 
   t.is(success2, false);
   t.is(typeof objc.deref(error2), 'object');
+});
+
+test('inout parameters 2 (^@)', t => {
+  const NSDictionary = objc.NSDictionary;
+  const NSAppleScript = objc.NSAppleScript;
+  let source = 'telll application "Safari" to get URL of current tab of window 1';
+
+  let script = NSAppleScript.alloc().initWithSource_(source);
+
+  let error = objc.ref(null);
+  let success = script.compileAndReturnError_(error);
+
+  t.is(success, false);
+  t.is(objc.deref(error).isKindOfClass_(NSDictionary), true);
 });
