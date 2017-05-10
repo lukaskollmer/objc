@@ -64,6 +64,19 @@ let NSString = objc.NSString;
 let hello = NSString.stringWithString_("Hello, World!");
 ```
 
+### Pass by reference
+It's common practice for Objective-C methods to pass back errors by reference.
+In the `objc` node module, this is implemented via two helper methods: `objc.ref` and `objc.deref`:
+
+```js
+var error = objc.ref(null);
+
+obj.callMethodThatPassesBackAnError_(error);
+error = objc.deref(error);
+
+console.log(error); // => 'NSError ...'
+```
+
 
 ## Automatic type conversion
 When calling Objective-C methods, argument and return types will automatically be converted from native JavaScript types to the expected Objective-C type (and vice versa):
