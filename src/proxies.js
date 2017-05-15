@@ -15,14 +15,14 @@ function ObjCProxy(object) {
 
       name = String(name);
       if (name === 'Symbol(util.inspect.custom)') {
+        let description = pointer.isNil() ? "<nil>" : pointer.description();
         return () => {
           let type = pointer.type() === 0 ? 'Class' : 'Instance';
-          return `[objc.${type}Proxy ${pointer.description()}]`;
+          return `[objc.${type}Proxy ${description}]`;
         };
       }
 
       if (name === '__ptr') {
-        console.log('will return ptr');
         return pointer;
       }
 
@@ -30,7 +30,6 @@ function ObjCProxy(object) {
     },
 
     set: (target, key, value) => {
-      console.log(`Will set ${key} to ${value}`);
       if (key === '__ptr') {
         pointer = value;
       }
