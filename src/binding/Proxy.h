@@ -30,6 +30,7 @@ namespace ObjC {
 
         static void Type(const FunctionCallbackInfo<Value>& args);
         static void Description(const FunctionCallbackInfo<Value>& args);
+        static void IsNil(const FunctionCallbackInfo<Value> &args);
 
     private:
         ~Proxy();

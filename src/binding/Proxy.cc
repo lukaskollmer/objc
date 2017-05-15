@@ -67,6 +67,7 @@ namespace ObjC {
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "call", Call);
         NODE_SET_PROTOTYPE_METHOD(tpl, "description", Description);
+        NODE_SET_PROTOTYPE_METHOD(tpl, "isNil", IsNil);
         NODE_SET_PROTOTYPE_METHOD(tpl, "type", Type);
         NODE_SET_PROTOTYPE_METHOD(tpl, "returnTypeOfMethod", ReturnTypeOfMethod);
 
@@ -132,6 +133,16 @@ namespace ObjC {
 
         args.GetReturnValue().Set(String::NewFromUtf8(isolate, desc));
 
+    }
+
+    void Proxy::IsNil(const FunctionCallbackInfo<Value> &args) {
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
+        auto isNil = obj->obj_ == nil;
+
+        args.GetReturnValue().Set(isNil);
     }
 
     void Proxy::Call(const FunctionCallbackInfo<Value>& args) {
