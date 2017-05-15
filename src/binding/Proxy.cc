@@ -197,14 +197,80 @@ namespace ObjC {
         // The argument indexes of all inout arguments (^@)
         std::set<int> inoutArgs;
 
+        // Why not use auto? -> http://stackoverflow.com/a/14532044/2513803
+        std::function<id (Local<Value>, const char*)> convertJavaScriptObjectToCorrespondingObjCType = [&](Local<Value> arg, const char* expectedType) -> id {
+
+            if (arg->IsObject() && !arg->IsArray()) { // Arrays are objects too
+                Local<Object> wrappedObject;
+
+                if (EQUAL(expectedType, "@")) {
+                    // args[i] is the JS Proxy type, we have to fetch the actual ObjC::Proxy wrapper via __ptr
+                    wrappedObject = arg->ToObject()->Get(__ptr_key)->ToObject();
+                } else if (EQUAL(expectedType, "^@")) {
+                    auto wrappedProxy = arg->ToObject()->Get(__ref_key);
+                    auto proxyIsNull = wrappedProxy->IsUndefined() || wrappedProxy->IsNull();
+
+                    if (proxyIsNull) {
+                        id _nullptr = (id)malloc(sizeof(id));
+                        return _nullptr;
+                    } else {
+                        wrappedObject = arg->ToObject()->Get(__ref_key)->ToObject()->Get(__ptr_key)->ToObject();
+                    }
+                }
+
+                Proxy *passedProxy = ObjectWrap::Unwrap<Proxy>(wrappedObject);
+                if (passedProxy != nullptr) {
+                    id argument = passedProxy->obj_;
+                    return argument;
+                } else {
+                    // TODO set nil as arg
+                }
+                // 2. if no wrapped object was passed, but a native type (string, number, bool), convert that
+            } else if (arg->IsString()) {
+                const char* stringValue = ValueToChar(isolate, arg);
+
+                id NSString = (id)objc_getClass("NSString");
+                id string = objc_call(id, NSString, "stringWithUTF8String:", stringValue);
+
+                return string;
+            } else if (arg->IsNumber()) {
+                double numberValue = arg->ToNumber()->Value();
+
+                id NSNumber = (id)objc_getClass("NSNumber");
+                id number = objc_call(id, NSNumber, "numberWithDouble:", numberValue);
+
+                return number;
+            } else if (arg->IsBoolean()) {
+                bool boolValue = arg->ToBoolean()->Value();
+
+                id NSNumber = (id)objc_getClass("NSNumber");
+                id number = objc_call(id, NSNumber, "numberWithBool:", boolValue);
+
+                return number;
+            } else if (arg->IsArray()) {  // TODO Convert array/dict as well?
+                Local<Array> argArray = Local<Array>::Cast(arg);
+
+                id NSMutableArray = (id)objc_getClass("NSMutableArray");
+                id objcArray = objc_call(id, NSMutableArray, "array");
+
+                for (int j = 0; j < argArray->Length(); ++j) {
+                    id arrayObject = convertJavaScriptObjectToCorrespondingObjCType(argArray->Get((uint32_t) j), "@");
+                    objc_call_noreturn(void, objcArray, "addObject:", arrayObject);
+                }
+
+                return objcArray;
+            }
+
+            return nil;
+
+        };
+
 
         for (int i = 1; i < args.Length(); ++i) {
-            int objcArgumentIndex = i + 1; // +1 bc we already start at 1
+            int objcArgumentIndex = i + 1; // +1 bc we already start at 1 (0 is the method name, added by the objc js module)
 
             auto expectedType = method_copyArgumentType(method, (unsigned int) objcArgumentIndex);
             Local<Value> arg = args[i];
-
-            //printf("arg #%i expects %s\n", i, expectedType);
 
             if (arg->IsNull() || arg->IsUndefined()) {
                 void* nilArgument = nullptr;
@@ -216,60 +282,10 @@ namespace ObjC {
                 inoutArgs.insert(objcArgumentIndex);
             }
 
-
             if (EQUAL(expectedType, "@") || EQUAL(expectedType, "^@")) {
-                // 1. check if a wrapped object was passed
-                if (arg->IsObject()) {
-                    Local<Object> wrappedObject;
+                id object = convertJavaScriptObjectToCorrespondingObjCType(arg, expectedType);
+                invocation.SetArgumentAtIndex(&object, objcArgumentIndex);
 
-
-                    if (EQUAL(expectedType, "@")) {
-                        // args[i] is the JS Proxy type, we have to fetch the actual ObjC::Proxy wrapper via __ptr
-                        wrappedObject = arg->ToObject()->Get(__ptr_key)->ToObject();
-                    } else if (EQUAL(expectedType, "^@")) {
-                        auto wrappedProxy = arg->ToObject()->Get(__ref_key);
-                        auto proxyIsNull = wrappedProxy->IsUndefined() || wrappedProxy->IsNull();
-
-                        if (proxyIsNull) {
-                            id _nullptr = (id)malloc(sizeof(id));
-                            invocation.SetArgumentAtIndex(&_nullptr, objcArgumentIndex);
-                            continue;
-                        } else {
-                            wrappedObject = arg->ToObject()->Get(__ref_key)->ToObject()->Get(__ptr_key)->ToObject();
-                        }
-                    }
-
-                    Proxy *passedProxy = ObjectWrap::Unwrap<Proxy>(wrappedObject);
-                    if (passedProxy != nullptr) {
-                        id argument = passedProxy->obj_;
-                        invocation.SetArgumentAtIndex(&argument, objcArgumentIndex);
-                        continue;
-                    } else {
-                        // TODO set nil as arg
-                    }
-                // 2. if no wrapped object was passed, but a native type (string, number, bool), convert that
-                } else if (arg->IsString()) {
-                    const char* stringValue = ValueToChar(isolate, arg);
-
-                    id NSString = (id)objc_getClass("NSString");
-                    id string = objc_call(id, NSString, "stringWithUTF8String:", stringValue);
-
-                    invocation.SetArgumentAtIndex(&string, objcArgumentIndex);
-                } else if (arg->IsNumber()) {
-                    double numberValue = arg->ToNumber()->Value();
-
-                    id NSNumber = (id)objc_getClass("NSNumber");
-                    id number = objc_call(id, NSNumber, "numberWithDouble:", numberValue);
-
-                    invocation.SetArgumentAtIndex(&number, objcArgumentIndex);
-                } else if (arg->IsBoolean()) {
-                    bool boolValue = arg->ToBoolean()->Value();
-
-                    id NSNumber = (id)objc_getClass("NSNumber");
-                    id number = objc_call(id, NSNumber, "numberWithBool:", boolValue);
-
-                    invocation.SetArgumentAtIndex(&number, objcArgumentIndex);
-                } // TODO Convert array/dict as well?
             } else if (EQUAL(expectedType, "#")) { // Class
                 // This will either take a proxy around a `Class` object or a string and convert that to the expected `Class` object
                 if (arg->IsString()) {
