@@ -16,4 +16,4 @@ console.log(`Initialized AppleScript object: ${script}`);
 let error = objc.ref(null);
 let result = script.executeAndReturnError_(error);
 
-console.log(result);
+console.log(result, objc.deref(error));
