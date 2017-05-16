@@ -110,7 +110,6 @@ This is very much still work in progress and there's a bunch of stuff that eithe
 - [ ] `NSArray` enumeration
 - [ ] `NSDictionary` ⇆ `Object` conversion
 - [ ] Blocks
-- [ ] Fix seemingly random "misaligned pointer" crashes
 - [ ] Support selectors that contain underscores
 - [ ] Implement class creation
 - [ ] Implement Method swizzling on existing Objective-C classes
