@@ -425,7 +425,7 @@ namespace ObjC {
             }
 
             // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
-            printf("will wrap return object for method: %s %s\n", sel_getName(sel), description(retval));
+            //printf("will wrap return object for method: %s %s\n", sel_getName(sel), description(retval));
             args.GetReturnValue().Set(CreateNewObjCWrapperFrom(retval));
             return;
         } else if (EQUAL(returnType, "c")) { // char
