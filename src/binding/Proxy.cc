@@ -6,7 +6,6 @@
 #include <string>
 #include <iostream>
 #include <set>
-#include <functional>
 #include "Proxy.h"
 #include "objc_call.h"
 
