@@ -411,18 +411,22 @@ namespace ObjC {
         if (EQUAL(returnType, "@")) {
             id retval = (id)malloc(sizeof(id));
             invocation.GetReturnValue(&retval);
+            
+            /**
+             * TODO: Implement this properly. Maybe define a package-wide config variable to allow the user to choose whether the objc module should always return wrapped objc objects
+             * date: 2017-05-16 09:15
+             */
+            //if (isKindOfClass(retval, "NSString")) {
+            //    char *charValue = objc_call(char*, retval, "UTF8String");
+            //    args.GetReturnValue().Set(String::NewFromUtf8(isolate, charValue));
+            //    return;
+            //}
 
-            if (isKindOfClass(retval, "NSString")) {
-                char *charValue = objc_call(char*, retval, "UTF8String");
-                args.GetReturnValue().Set(String::NewFromUtf8(isolate, charValue));
-                return;
-            }
-
-            if (isKindOfClass(retval, "NSNumber")) {
-                double value = objc_call(double, retval, "doubleValue");
-                args.GetReturnValue().Set(value);
-                return;
-            }
+            //if (isKindOfClass(retval, "NSNumber")) {
+            //    double value = objc_call(double, retval, "doubleValue");
+            //    args.GetReturnValue().Set(value);
+            //    return;
+            //}
 
             // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
             //printf("will wrap return object for method: %s %s\n", sel_getName(sel), description(retval));
