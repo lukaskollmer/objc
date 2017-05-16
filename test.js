@@ -37,7 +37,7 @@ test('load constant w/ full bundle name', t => {
   t.is(NSFontAttributeName, 'NSFont');
 });
 
-test('get username using NSProcessInfo, convert to javascript string and compare the value to the username given by `os.userInfo()`', t => { // eslint-disable-line ava/no-skip-test
+test('get username using NSProcessInfo, convert to javascript string and compare the value to the username given by `os.userInfo()`', t => {
   const NSProcessInfo = objc.NSProcessInfo;
   const os = require('os');
 
@@ -47,7 +47,7 @@ test('get username using NSProcessInfo, convert to javascript string and compare
   t.is(String(username), os.userInfo().username);
 });
 
-test('primitive argument types', t => { // eslint-disable-line ava/no-skip-test
+test('primitive argument types', t => {
   const NSNumber = objc.NSNumber;
 
   let number = NSNumber.numberWithInt_(5);
