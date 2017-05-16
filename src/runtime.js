@@ -42,5 +42,9 @@ module.exports = {
     }
 
     return new ObjCProxy(object.ref);
+  },
+
+  array: input => {
+    console.log(`create array from ${input}`);
   }
 };
