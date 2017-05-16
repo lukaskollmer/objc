@@ -11,12 +11,6 @@
       ],
       "include_dirs": [
         "<!(node -e \"require('nan')\")",
-      ],
-      "libraries": [
-	  ],
-      "cflags": [
-        "-std=c++11",
-        "-stdlib=libc++"
       ]
     }
   ]
