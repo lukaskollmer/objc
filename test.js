@@ -89,3 +89,16 @@ test('inout parameters 2 (^@)', t => {
   t.is(success, false);
   t.is(objc.deref(error).isKindOfClass_(NSDictionary), true);
 });
+
+test('Automatic array conversion (JS array -> NSArray)', t => {
+  let NSArray = objc.NSArray;
+
+  let inputArray = ['I', 'am', 'the', 'doctor'];
+  let array = NSArray.arrayWithArray_(inputArray);
+
+  inputArray.forEach((object, index) => {
+    let str1 = String(object);
+    let str2 = String(array.objectAtIndex_(index));
+    t.is(str1, str2);
+  });
+});
