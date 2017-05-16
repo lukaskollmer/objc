@@ -155,10 +155,29 @@ namespace ObjC {
         Local<String> __ptr_key = String::NewFromUtf8(isolate, "__ptr");
         Local<String> __ref_key = String::NewFromUtf8(isolate, "ref");
 
+        auto isKindOfClass = [](id object, const char *classname) -> bool {
+            return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
+        };
+
+        auto align_upwards = [](id obj, uintptr_t align) -> id {
+            assert(align > 0 && (align & (align - 1)) == 0); /* Power of 2 */
+
+            uintptr_t addr  = (uintptr_t)obj;
+            if (addr % align != 0)
+                addr += align - addr % align;
+            assert(addr >= (uintptr_t)obj);
+            return (id)addr;
+        };
+
 
         // Wrap an `id` in a `ObjC::Proxy` in a `Local<Object>` that can be returned by v8
         auto CreateNewObjCWrapperFrom = [&](id obj) -> Local<Object> {
             if (!is_aligned(obj)) {
+                printf("NOT ALIGNED\n");
+
+                //printf("is string: %i\n", isKindOfClass(obj, "NSString"));
+
+
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Internal Error: Unable to align pointer")));
                 return Undefined(isolate)->ToObject();
             }
@@ -390,13 +409,8 @@ namespace ObjC {
         //printf("%s - %s\n", returnType, sel_getName(sel));
 
         if (EQUAL(returnType, "@")) {
-            id retval;
+            id retval = (id)malloc(sizeof(id));
             invocation.GetReturnValue(&retval);
-
-            auto isKindOfClass = [](id object, const char *classname) -> bool {
-                return false; // TODO Re-enable this
-                return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
-            };
 
             if (isKindOfClass(retval, "NSString")) {
                 char *charValue = objc_call(char*, retval, "UTF8String");
@@ -411,7 +425,7 @@ namespace ObjC {
             }
 
             // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
-
+            printf("will wrap return object for method: %s %s\n", sel_getName(sel), description(retval));
             args.GetReturnValue().Set(CreateNewObjCWrapperFrom(retval));
             return;
         } else if (EQUAL(returnType, "c")) { // char
