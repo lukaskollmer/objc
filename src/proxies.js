@@ -15,7 +15,7 @@ function ObjCProxy(object) {
 
       name = String(name);
       if (name === 'Symbol(util.inspect.custom)') {
-        let description = pointer.isNil() ? "<nil>" : pointer.description();
+        let description = pointer.isNil() ? '<nil>' : pointer.description();
         return () => {
           let type = pointer.type() === 0 ? 'Class' : 'Instance';
           return `[objc.${type}Proxy ${description}]`;
