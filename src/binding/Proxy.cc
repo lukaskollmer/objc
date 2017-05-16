@@ -26,6 +26,17 @@ inline bool is_aligned( T*p, size_t n = alignof(T) ){
     return 0 == reinterpret_cast<uintptr_t>(p) % n ;
 }
 
+/**
+ * This is a small helper class to wrap an `id` object.
+ *
+ * Why? Because v8 expects 2-byte aligned objects and we can't control whether `id`s we get from the objc runtime are aligned
+ * But we can store the misaligned pointer in an aligned pointer to the wrapper
+ */
+class AlignedObjectWrapper {
+public:
+    AlignedObjectWrapper(id object) : object(object) {}
+    id object;
+};
 
 #define HANDLE_RETURN_TYPE(type) \
     type retval; \
@@ -98,7 +109,8 @@ namespace ObjC {
                 break;
             }
             case Type::instance: {
-                object = (id)args[1]->ToObject()->GetAlignedPointerFromInternalField(0);
+                auto wrapper = (AlignedObjectWrapper* )args[1]->ToObject()->GetAlignedPointerFromInternalField(0);
+                object = wrapper->object;
                 break;
             }
         }
@@ -170,29 +182,38 @@ namespace ObjC {
         };
 
 
-        // Wrap an `id` in a `ObjC::Proxy` in a `Local<Object>` that can be returned by v8
+        // Wrap an `id` in a `AlignedObjectWrapper` in a `ObjC::Proxy` in a `Local<Object>` that can be returned by v8
+
+        // Returns:
+        // Local<Value>
+        // └── AlignedObjectWrapper
+        //     └── ObjC::Proxy
+        //         └── id
+        // (sorry)
         auto CreateNewObjCWrapperFrom = [&](id obj) -> Local<Object> {
-            if (!is_aligned(obj)) {
-                printf("NOT ALIGNED\n");
+            // aligning-code adapted from http://stackoverflow.com/a/6320314/2513803
+            void * p = new AlignedObjectWrapper(obj);
 
-                //printf("is string: %i\n", isKindOfClass(obj, "NSString"));
-
-
+            std::size_t const size = sizeof(p);
+            std::size_t space = size;
+            void* aligned = std::align(2, sizeof(p), p, space);
+            if(aligned == nullptr) {
+                // failed to align
                 isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Internal Error: Unable to align pointer")));
                 return Undefined(isolate)->ToObject();
+            } else {
+                Local<Object> object = TemplateObject->NewInstance();
+                object->SetAlignedPointerInInternalField(0, aligned);
+                // TODO ^^ This sometimes crashes w/ a "pointer not aligned" error message (seems to happen at random, should try to fix eventually)
+
+                const unsigned argc = 2;
+                Local<Value> argv[argc] = {Number::New(isolate, 1), object};
+                Local<Function> cons = Local<Function>::New(isolate, constructor);
+                Local<Context> context = isolate->GetCurrentContext();
+                Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
+
+                return instance;
             }
-
-            Local<Object> object = TemplateObject->NewInstance();
-            object->SetAlignedPointerInInternalField(0, obj);
-            // TODO ^^ This sometimes crashes w/ a "pointer not aligned" error message (seems to happen at random, should try to fix eventually)
-
-            const unsigned argc = 2;
-            Local<Value> argv[argc] = {Number::New(isolate, 1), object};
-            Local<Function> cons = Local<Function>::New(isolate, constructor);
-            Local<Context> context = isolate->GetCurrentContext();
-            Local<Object> instance = cons->NewInstance(context, argc, argv).ToLocalChecked();
-
-            return instance;
         };
 
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
@@ -409,8 +430,12 @@ namespace ObjC {
         //printf("%s - %s\n", returnType, sel_getName(sel));
 
         if (EQUAL(returnType, "@")) {
-            id retval = (id)malloc(sizeof(id));
+            id retval = (id) malloc(sizeof(id));
             invocation.GetReturnValue(&retval);
+            args.GetReturnValue().Set(CreateNewObjCWrapperFrom(retval));
+
+            return;
+
 
             /**
              * TODO: Implement this properly. Maybe define a package-wide config variable to allow the user to choose whether the objc module should always return wrapped objc objects
@@ -427,11 +452,6 @@ namespace ObjC {
             //    args.GetReturnValue().Set(value);
             //    return;
             //}
-
-            // TODO convert other types like NSArray, NSDictionary, NSURL, etc to native objects
-            //printf("will wrap return object for method: %s %s\n", sel_getName(sel), description(retval));
-            args.GetReturnValue().Set(CreateNewObjCWrapperFrom(retval));
-            return;
         } else if (EQUAL(returnType, "c")) { // char
             // Fun Fact: ObjC BOOLs are encoded as char https://developer.apple.com/reference/objectivec/bool?language=objc
             HANDLE_RETURN_TYPE(char);
