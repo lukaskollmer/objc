@@ -101,3 +101,17 @@ test('Automatic array conversion (JS array -> NSArray)', t => {
     t.is(str1, str2);
   });
 });
+
+test('Iterate over a NSArray', t => {
+  let NSArray = objc.NSArray;
+
+  let inputArray = ['hey', 'missy', 'you', 'so', 'fine'];
+  let array = NSArray.arrayWithArray_(inputArray);
+
+  for (let element of array) {
+    let index = inputArray.indexOf(String(element));
+    inputArray.splice(index, 1);
+  }
+
+  t.is(inputArray.length, 0);
+});
