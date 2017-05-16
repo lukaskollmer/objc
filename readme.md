@@ -107,7 +107,6 @@ let number = Number(age); // This is now a native JavaScript number
 ## TODO
 This is very much still work in progress and there's a bunch of stuff that either has some bugs or still needs to be implemented:
 - [ ] Support selectors that contain underscores
-- [ ] `NSArray` enumeration
 - [ ] `NSDictionary` ⇆ `Object` conversion
 - [ ] Blocks
 - [ ] Implement class creation
