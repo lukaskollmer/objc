@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <set>
+#include <functional>
 #include "Proxy.h"
 #include "objc_call.h"
 
@@ -411,7 +412,7 @@ namespace ObjC {
         if (EQUAL(returnType, "@")) {
             id retval = (id)malloc(sizeof(id));
             invocation.GetReturnValue(&retval);
-            
+
             /**
              * TODO: Implement this properly. Maybe define a package-wide config variable to allow the user to choose whether the objc module should always return wrapped objc objects
              * date: 2017-05-16 09:15
