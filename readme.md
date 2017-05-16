@@ -1,4 +1,4 @@
-# objc [![Build Status](https://travis-ci.org/lukaskollmer/objc.svg?branch=master)](https://travis-ci.org/lukaskollmer/objc)
+# objc [![Build Status](https://travis-ci.org/lukaskollmer/objc.svg?branch=master)](https://travis-ci.org/lukaskollmer/objc)  [![npm](https://img.shields.io/npm/v/objc.svg)](https://www.npmjs.com/package/objc) [![node](https://img.shields.io/node/v/objc.svg)](https://www.npmjs.com/package/objc)
 
 > NodeJS ⇆ Objective-C bridge _(experimental)_
 
