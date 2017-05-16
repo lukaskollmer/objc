@@ -12,3 +12,6 @@ console.log(now);
 // Convert the NSDate object to a JavaScript date
 let asJSDate = objc.js(now);
 console.log(asJSDate);
+
+let asNSDate = objc.ns(asJSDate);
+console.log(asNSDate);
