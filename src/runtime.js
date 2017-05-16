@@ -3,6 +3,7 @@ const ffi = require('ffi');
 require('ref'); // eslint-disable-line import/no-unassigned-import
 const binding = require('bindings')('objc.node');
 const ObjCProxy = require('./proxies').ObjCProxy;
+const ProxyType = require('./enums');
 
 const libobjc = new ffi.Library('libobjc', {
   objc_getClass: ['pointer', ['string']] // eslint-disable-line camelcase
@@ -45,6 +46,21 @@ module.exports = {
   },
 
   array: input => {
-    console.log(`create array from ${input}`);
+    // NSArray -> JavaScript array
+    if (typeof input.__ptr === 'object' && input.isKindOfClass_('NSArray')) {
+      // Is NSArray
+      let array = [];
+      for (var i = 0; i < input.count(); i++) {
+        array.push(input.objectAtIndex_(i));
+      }
+      return array;
+    }
+
+    // JavaScript array -> NSArray
+    if (input.constructor === Array) {
+      // Is JavaScript array
+      var NSArray = new ObjCProxy(new binding.Proxy(ProxyType.class, 'NSArray')); // We can't require the objc module directly because we have to avoid circular dependencies
+      return NSArray.arrayWithArray_(input);
+    }
   }
 };
