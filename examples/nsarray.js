@@ -12,4 +12,8 @@ console.log("array:", array);
 console.log("count:", array.count());
 
 console.log("array[1]:", array.objectAtIndex_(1));
-console.log("first object:", array.firstObject());
+//console.log("first object:", array.firstObject());
+
+// Sort
+let sortedUsingSelector = array.sortedArrayUsingSelector_("caseInsensitiveCompare:")
+console.log("sorted", sortedUsingSelector);
