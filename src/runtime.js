@@ -55,26 +55,21 @@ module.exports = {
     if (typeof input.__ptr === 'object' && input.isKindOfClass_('NSObject')) {
       if (input.isKindOfClass_('NSString')) {
         return String(input);
-
       } else if (input.isKindOfClass_('NSNumber')) {
         return Number(input);
-
       } else if (input.isKindOfClass_('NSArray')) {
         let array = [];
         for (var i = 0; i < input.count(); i++) {
           array.push(input.objectAtIndex_(i));
         }
         return array;
-
       } else if (input.isKindOfClass_('NSDate')) {
         let timeIntervalSince1970 = input.timeIntervalSince1970();
         // NSDate returns seconds, but JavaScript expects milliseconds
         return new Date(timeIntervalSince1970 * 1000);
-
-      } else {
-        // No native JavaScript type for this object, return the input
-        return input;
       }
+      // No native JavaScript type for this object, return the input
+      return input;
     }
   },
 
@@ -88,13 +83,11 @@ module.exports = {
       case 'object': {
         if (input.constructor === Array) {
           return _GetObjCClass('NSArray').arrayWithArray_(input);
-
         } else if (input.constructor === Date) {
           let secondsSince1970 = Number(input) / 1000;
           return _GetObjCClass('NSDate').dateWithTimeIntervalSince1970_(secondsSince1970);
-        } else {
-          return input;
         }
+        return input;
       }
       default:
         return input;
