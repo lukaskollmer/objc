@@ -13,6 +13,19 @@ function ObjCProxy(object) {
         };
       }
 
+      if (name === Symbol.iterator) {
+        let enumerator = (new MethodProxy(pointer, 'objectEnumerator'))();
+        return function *() {
+          var nextObject;
+          while(nextObject = enumerator.nextObject()) { // nextObject is never `null` or `undefined`
+            if (nextObject.__ptr.isNil() === true) {
+              break;
+            }
+            yield nextObject;
+          }
+        }
+      }
+
       name = String(name);
       if (name === 'Symbol(util.inspect.custom)') {
         let description = pointer.isNil() ? '<nil>' : pointer.description();

@@ -23,3 +23,8 @@ console.log('js:', asJSArray);
 
 let nsarrayFromJs = objc.ns(['missy', 'you', 'so', 'fine']);
 console.log('ns:', nsarrayFromJs);
+
+// Iterate over an array
+for (let str of array) {
+	console.log(String(str));
+}
