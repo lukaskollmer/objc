@@ -18,7 +18,7 @@ console.log("array[1]:", array.objectAtIndex_(1));
 let sortedUsingSelector = array.sortedArrayUsingSelector_("caseInsensitiveCompare:")
 console.log("sorted", sortedUsingSelector);
 
-let asJSArray = objc.array(array);
+let asJSArray = objc.js(array);
 console.log('js:', asJSArray);
 
 let nsarrayFromJs = objc.array(['missy', 'you', 'so', 'fine']);
