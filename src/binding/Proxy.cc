@@ -13,6 +13,8 @@
 #include "utils.h"
 
 
+#define v8String(str) v8::String::NewFromUtf8(isolate, str)
+
 
 SEL resolveSelector(id target, const char *sel) {
     std::string selector(sel);
@@ -53,7 +55,7 @@ public:
 #define ARGTYPE_NOT_SUPPORTED(type) \
     char *excMessage; \
     asprintf(&excMessage, "Error setting argument: Type '%s' not yet supported. Sorry.", type); \
-    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage))); \
+    isolate->ThrowException(v8::Exception::Error(v8String(excMessage))); \
     free(excMessage); \
     return; \
 
@@ -73,7 +75,7 @@ namespace ObjC {
         HandleScope scope(isolate);
 
         Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-        tpl->SetClassName(String::NewFromUtf8(isolate, "Proxy"));
+        tpl->SetClassName(v8String("Proxy"));
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "call", Call);
@@ -84,7 +86,7 @@ namespace ObjC {
 
 
         constructor.Reset(isolate, tpl->GetFunction());
-        exports->Set(String::NewFromUtf8(isolate, "Proxy"), tpl->GetFunction());
+        exports->Set(v8String("Proxy"), tpl->GetFunction());
     }
 
 
@@ -102,7 +104,7 @@ namespace ObjC {
                 if (object == NULL) {
                     char *excMessage;
                     asprintf(&excMessage, "Error: Class with name '%s' doesn't exist", classname);
-                    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage)));
+                    isolate->ThrowException(v8::Exception::Error(v8String( excMessage)));
                     free(excMessage);
                     return;
                 }
@@ -143,7 +145,7 @@ namespace ObjC {
         id description = objc_call(id, object->obj_, "description");
         char *desc = objc_call(char*, description, "UTF8String");
 
-        args.GetReturnValue().Set(String::NewFromUtf8(isolate, desc));
+        args.GetReturnValue().Set(v8String(desc));
 
     }
 
@@ -164,8 +166,8 @@ namespace ObjC {
         Local<ObjectTemplate> TemplateObject = ObjectTemplate::New();
         TemplateObject->SetInternalFieldCount(1);
 
-        Local<String> __ptr_key = String::NewFromUtf8(isolate, "__ptr");
-        Local<String> __ref_key = String::NewFromUtf8(isolate, "ref");
+        Local<String> __ptr_key = v8String("__ptr");
+        Local<String> __ref_key = v8String("ref");
 
         auto isKindOfClass = [](id object, const char *classname) -> bool {
             return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
@@ -183,6 +185,7 @@ namespace ObjC {
 
 
         // Wrap an `id` in a `AlignedObjectWrapper` in a `ObjC::Proxy` in a `Local<Object>` that can be returned by v8
+        // TODO v8::External might work as well
 
         // Returns:
         // Local<Value>
@@ -199,7 +202,7 @@ namespace ObjC {
             void* aligned = std::align(2, sizeof(p), p, space);
             if(aligned == nullptr) {
                 // failed to align
-                isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Internal Error: Unable to align pointer")));
+                isolate->ThrowException(Exception::Error(v8String("Internal Error: Unable to align pointer")));
                 return Undefined(isolate)->ToObject();
             } else {
                 Local<Object> object = TemplateObject->NewInstance();
@@ -333,12 +336,12 @@ namespace ObjC {
                     Class cls = objc_getClass(classname);
                     invocation.SetArgumentAtIndex(&cls, objcArgumentIndex);
                 } else if (arg->IsObject()) {
-                    Local<Object> wrappedObject = arg->ToObject()->Get(String::NewFromUtf8(isolate, "__ptr"))->ToObject();
+                    Local<Object> wrappedObject = arg->ToObject()->Get(v8String("__ptr"))->ToObject();
 
                     Proxy *passedClassProxy = ObjectWrap::Unwrap<Proxy>(wrappedObject);
                     if (passedClassProxy != nullptr) {
                         if (passedClassProxy->type_ == Type::klass) {
-                            Class cls = (Class)passedClassProxy->obj_;
+                            Class cls = (Class) passedClassProxy->obj_;
                             invocation.SetArgumentAtIndex(&cls, objcArgumentIndex);
                         } else {
                             // TODO ???
@@ -347,6 +350,51 @@ namespace ObjC {
                         // TODO pass nil?
                     }
                 }
+            } else if (EQUAL(expectedType, "@?")) { // Block
+                ARGTYPE_NOT_SUPPORTED("Block");
+                /*
+                printf("expects a block at #%i\n", objcArgumentIndex);
+
+                auto classname = ValueToChar(isolate, arg->ToObject()->GetConstructorName());
+
+                if (EQUAL(classname, "Block")) {
+                    //auto fn = arg->ToObject()->Get(v8String("fn")).As<Function>();
+                }
+
+                auto fn = Local<Function>::Cast(arg);
+
+                printf("callable: %i\n", fn->IsCallable());
+
+                Local<Value> argss[2];
+                argss[0] = Number::New(isolate, 1);
+                argss[1] = Number::New(isolate, 2);
+
+                auto res = fn->Call(Undefined(isolate), 2, argss);
+
+                printf("val: %lf\n", res->ToNumber()->Value());
+
+                /*auto ext = arg.As<External>();
+                printf("ext->Value(): %p\n", ext->Value());
+
+
+                auto ext2 = Local<External>::New(isolate, External::New(isolate, NULL));
+                printf("ext2->Value(): %p\n", ext2->Value());*/
+
+
+
+                //printf("ext: %p\n", ext);
+                //printf("ext value: %p\n", ext->Value());
+
+                //int (*fn) (int, int) = (int (*) (int, int)) ext->Value();
+
+                //printf("fn is nil: %i\n", fn == nullptr);
+
+                //auto fn = object->GetAlignedPointerFromInternalField(0);
+
+                //printf("fn: %p\n", fn);*/
+
+
+
             } else if (EQUAL(expectedType, "c")) { // char
                 ARGTYPE_NOT_SUPPORTED("char");
             } else if (EQUAL(expectedType, "i")) { // int
@@ -482,7 +530,7 @@ namespace ObjC {
         } else if (EQUAL(returnType, "*") || EQUAL(returnType, "r*")) { // char*, const char*
             char* retval;
             invocation.GetReturnValue(&retval);
-            Local<Value> string = String::NewFromUtf8(isolate, retval);
+            Local<Value> string = v8String(retval);
             args.GetReturnValue().Set(string);
             return;
         } else if (EQUAL(returnType, "#")) { // Class
@@ -512,6 +560,6 @@ namespace ObjC {
 
         const char *returnType = method_copyReturnType(method);
 
-        args.GetReturnValue().Set(String::NewFromUtf8(isolate, returnType));
+        args.GetReturnValue().Set(v8String(returnType));
     }
 }

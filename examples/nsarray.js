@@ -21,5 +21,5 @@ console.log("sorted", sortedUsingSelector);
 let asJSArray = objc.js(array);
 console.log('js:', asJSArray);
 
-let nsarrayFromJs = objc.array(['missy', 'you', 'so', 'fine']);
+let nsarrayFromJs = objc.ns(['missy', 'you', 'so', 'fine']);
 console.log('ns:', nsarrayFromJs);
