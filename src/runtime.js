@@ -9,6 +9,11 @@ const libobjc = new ffi.Library('libobjc', {
   objc_getClass: ['pointer', ['string']] // eslint-disable-line camelcase
 });
 
+function _GetObjCClass(name) {
+  // We can't require the objc module directly because we have to avoid circular dependencies
+  return new ObjCProxy(new binding.Proxy(ProxyType.class, name));
+}
+
 module.exports = {
   getClass: name => {
     return libobjc.objc_getClass(name);
@@ -45,22 +50,54 @@ module.exports = {
     return new ObjCProxy(object.ref);
   },
 
-  array: input => {
-    // NSArray -> JavaScript array
-    if (typeof input.__ptr === 'object' && input.isKindOfClass_('NSArray')) {
-      // Is NSArray
-      let array = [];
-      for (var i = 0; i < input.count(); i++) {
-        array.push(input.objectAtIndex_(i));
-      }
-      return array;
-    }
+  js: input => {
+    // Convert an objc object to its native JavaScript counterpart (NSString -> String, NSNumber -> Number, etc)
+    if (typeof input.__ptr === 'object' && input.isKindOfClass_('NSObject')) {
+      if (input.isKindOfClass_('NSString')) {
+        return String(input);
 
-    // JavaScript array -> NSArray
-    if (input.constructor === Array) {
-      // Is JavaScript array
-      var NSArray = new ObjCProxy(new binding.Proxy(ProxyType.class, 'NSArray')); // We can't require the objc module directly because we have to avoid circular dependencies
-      return NSArray.arrayWithArray_(input);
+      } else if (input.isKindOfClass_('NSNumber')) {
+        return Number(input);
+
+      } else if (input.isKindOfClass_('NSArray')) {
+        let array = [];
+        for (var i = 0; i < input.count(); i++) {
+          array.push(input.objectAtIndex_(i));
+        }
+        return array;
+
+      } else if (input.isKindOfClass_('NSDate')) {
+        let timeIntervalSince1970 = input.timeIntervalSince1970();
+        // NSDate returns seconds, but JavaScript expects milliseconds
+        return new Date(timeIntervalSince1970 * 1000);
+
+      } else {
+        // No native JavaScript type for this object, return the input
+        return input;
+      }
+    }
+  },
+
+  ns: input => {
+    // Convert a JS object to its native objc counterpart (String -> NSString, Number -> NSNumber, etc)
+    switch (typeof input) {
+      case 'string':
+        return _GetObjCClass('NSString').stringWithString_(input);
+      case 'number':
+        return _GetObjCClass('NSNumber').numberWithDouble_(input);
+      case 'object': {
+        if (input.constructor === Array) {
+          return _GetObjCClass('NSArray').arrayWithArray_(input);
+
+        } else if (input.constructor === Date) {
+          let secondsSince1970 = Number(input) / 1000;
+          return _GetObjCClass('NSDate').dateWithTimeIntervalSince1970_(secondsSince1970);
+        } else {
+          return input;
+        }
+      }
+      default:
+        return input;
     }
   }
 };
