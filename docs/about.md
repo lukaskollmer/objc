@@ -24,3 +24,5 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 - [Constants](/objc/constants.html)
 - [Converting objects](/objc/converting-objects.html)
 - [Pass by reference](/objc/pass-by-reference.html)
+
+(more documentation coming soon...)
