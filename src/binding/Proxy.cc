@@ -12,9 +12,6 @@
 #include "Invocation.h"
 #include "utils.h"
 
-#include "deps/cppitertools-0.2.1/product.hpp"
-
-
 #define v8String(str) v8::String::NewFromUtf8(isolate, str)
 
 
