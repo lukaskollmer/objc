@@ -84,6 +84,6 @@ let objcArray = objc.ns(array);     // => NSArray of NSStrings
 let jsArray   = objs.js(objcArray); // => JS Array of NSStrings
 ```
 
-Line 3 bahaves as expected (`objc.ns(array)` returns a `NSArray*` containing `NSString*` objects).
+Line 3 behaves as expected (`objc.ns(array)` returns a `NSArray*` containing `NSString*` objects).
 Line 4 however does not return a JavaScript `Array` containing JavaScript `String` objects, as one might expect, but a JavaScript `Array` containing `NSString*` objects.
 
