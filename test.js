@@ -16,6 +16,13 @@ test('primitive return values', t => {
   t.is(typeof length, 'number');
 });
 
+test('load constant directly from `objc` module', t => {
+  objc.import('AppKit');
+  const NSFontAttributeName = objc.NSFontAttributeName;
+
+  t.is(NSFontAttributeName, 'NSFont');
+});
+
 test('load constant w/out bundle', t => {
   objc.import('AppKit');
   const NSFontAttributeName = objc.constant('NSFontAttributeName');
