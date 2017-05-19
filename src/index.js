@@ -16,18 +16,7 @@ module.exports = new Proxy(() => {}, {
     if (runtime.classExists(name)) {
       return new ObjCProxy(new binding.Proxy(ProxyType.class, name));
     }
-
+    
     return runtime.constant(name);
-  },
-
-  apply: (target, thisArg, argv) => {
-    let arg = argv[0];
-    if (typeof arg === 'string') {
-      let NSString = module.exports.NSString;
-      return NSString.stringWithString_(arg);
-    }
-
-    // Maybe convert numbers to NSNumber but that a) doesn't work rn (misaligned pointer, ugh) and b) NSNumber isn't that commonny used anyway
-    return arg;
   }
 });
