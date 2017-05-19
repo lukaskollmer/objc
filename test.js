@@ -262,3 +262,38 @@ test('description of method proxy', t => {
 
   t.is(description, '[objc.MethodProxy for date]');
 });
+
+test('Class class methods', t => {
+  const NSString = objc.NSString;
+
+  const classMethods = NSString.__classMethods;
+
+  t.is(Array.isArray(classMethods), true);
+
+  // Includes methods inherited from NSObject
+  t.true(classMethods.includes('load'));
+  t.true(classMethods.includes('init'));
+
+  // Includes NSString-specific methods
+  t.true(classMethods.includes('stringWithCString:'));
+  t.true(classMethods.includes('stringWithFormat:'));
+  t.true(classMethods.includes('stringEncodingForData:encodingOptions:convertedString:usedLossyConversion:'));
+});
+
+test('Class instance methods', t => {
+  const NSString = objc.NSString;
+
+  const classMethods = NSString.__instanceMethods;
+
+  t.is(Array.isArray(classMethods), true);
+
+  // Includes methods inherited from NSObject
+  t.true(classMethods.includes('copy'));
+  t.true(classMethods.includes('description'));
+
+  // Includes NSString-specific methods
+  t.true(classMethods.includes('length'));
+  t.true(classMethods.includes('cStringUsingEncoding:'));
+  t.true(classMethods.includes('compare:options:range:locale:'));
+  t.true(classMethods.includes('getBytes:maxLength:usedLength:encoding:options:range:remainingRange:'));
+});
