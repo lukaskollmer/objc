@@ -1,4 +1,4 @@
-# Loading ObjC Constants
+# Loading ObjC constants
 
 You can load `NSString *` constants exported by Objective-C frameworks either via the `objc.constant(name, [bundleId])` function, or simply by accessing the constant directly via its name (the same way you'd load a class).
 
