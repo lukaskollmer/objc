@@ -167,7 +167,7 @@ namespace ObjC {
 
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
 
-
+        // TODO: Add an option to load _only_ the methods of the class, not methods it inherited from its superclasses
         auto getMethodsOfClass = [](Class cls) -> vector<string> {
             // TODO cache these...
             std::set<std::string>methods;
