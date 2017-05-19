@@ -1,6 +1,6 @@
 # Calling methods
 
-When calling Objective-C methods, all you need to do is replace all colons in the selector with underscores.
+When calling Objective-C methods, all you need to do is replace the colons in the selector with underscores.
 
 For example, this Objective-C code:
 
