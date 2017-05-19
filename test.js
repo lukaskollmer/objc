@@ -333,3 +333,39 @@ test('Type conversion JS -> ObjC: Date', t => {
 
   t.true(asNSDate.isKindOfClass_(NSDate));
 });
+
+test('Type conversion ObjC -> JS: String', t => {
+  const NSString = objc.NSString;
+
+  const input = NSString.stringWithString_('trust me. i am the doctor');
+  const asString = objc.js(input);
+
+  t.is(asString, 'trust me. i am the doctor');
+});
+
+test('Type conversion ObjC -> JS: Number', t => {
+  const NSNumber = objc.NSNumber;
+
+  const input = NSNumber.numberWithInt_(42);
+  const asNumber = objc.js(input);
+
+  t.is(asNumber, 42);
+});
+
+test('Type conversion ObjC -> JS: Array', t => {
+  const NSArray = objc.NSArray;
+
+  const input = NSArray.arrayWithArray_(['time', 'and', 'relative', 'dimensions', 'in', 'space']);
+  const asArray = objc.js(input);
+
+  t.is(asArray.length, 6);
+});
+
+test('Type conversion ObjC -> JS: Date', t => {
+  const NSDate = objc.NSDate;
+
+  const input = NSDate.date();
+  const asDate = objc.js(input);
+
+  t.true(asDate instanceof Date);
+});
