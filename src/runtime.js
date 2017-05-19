@@ -75,6 +75,7 @@ module.exports = {
 
   ns: input => {
     // Convert a JS object to its native objc counterpart (String -> NSString, Number -> NSNumber, etc)
+    // TODO: Boolean -> NSNumber??
     switch (typeof input) {
       case 'string':
         return _GetObjCClass('NSString').stringWithString_(input);

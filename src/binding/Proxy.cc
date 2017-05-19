@@ -12,16 +12,16 @@
 #include "Invocation.h"
 #include "utils.h"
 
+#include "deps/cppitertools-0.2.1/product.hpp"
+
 
 #define v8String(str) v8::String::NewFromUtf8(isolate, str)
 
 
-SEL resolveSelector(id target, const char *sel) {
-    std::string selector(sel);
+using std::vector;
+using std::string;
 
-    std::replace(selector.begin(), selector.end(), '_', ':'); // TODO make this smart and support methods that include an unserscore
-    return sel_getUid(selector.c_str());
-}
+
 
 template< typename T >
 inline bool is_aligned( T*p, size_t n = alignof(T) ){
@@ -81,6 +81,10 @@ namespace ObjC {
         NODE_SET_PROTOTYPE_METHOD(tpl, "call", Call);
         NODE_SET_PROTOTYPE_METHOD(tpl, "description", Description);
         NODE_SET_PROTOTYPE_METHOD(tpl, "isNil", IsNil);
+
+        NODE_SET_PROTOTYPE_METHOD(tpl, "methods", Methods);
+        //NODE_SET_PROTOTYPE_METHOD(tpl, "hasMethod", HasMethod);
+
         NODE_SET_PROTOTYPE_METHOD(tpl, "type", Type);
         NODE_SET_PROTOTYPE_METHOD(tpl, "returnTypeOfMethod", ReturnTypeOfMethod);
 
@@ -159,6 +163,56 @@ namespace ObjC {
         args.GetReturnValue().Set(isNil);
     }
 
+    void Proxy::Methods(const FunctionCallbackInfo<Value> &args) {
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        const char *methodType = ValueToChar(isolate, args[0]);
+
+        Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
+
+
+        auto getMethodsOfClass = [](Class cls) -> vector<string> {
+            // TODO cache these...
+            std::set<std::string>methods;
+
+            do {
+                uint count = 0;
+                Method* methodList = class_copyMethodList(cls, &count);
+
+                for (int i = 0; i < count; ++i) {
+                    Method m = methodList[i];
+                    methods.insert(sel_getName(method_getName(m)));
+                }
+                free(methodList);
+            } while (cls = class_getSuperclass(cls));
+
+            return vector<string>(methods.begin(), methods.end());
+        };
+
+
+
+        Class classOfObject = ([&](id object) -> Class {
+            switch (obj->type_) {
+                case Type::klass: return (Class)object;
+                case Type::instance: return objc_call(Class, object, "classForCoder");
+            }
+        })(obj->obj_);
+
+
+        Class cls = EQUAL(methodType, "class") ? object_getClass((id)classOfObject) : classOfObject;
+
+        auto methods = getMethodsOfClass(cls);
+
+        Local<Array> javaScriptMethodList = Array::New(isolate, (int) methods.size());
+
+        for (int i = 0; i < methods.size(); ++i) {
+            javaScriptMethodList->Set((uint32_t) i, v8String(methods[i].c_str()));
+        }
+
+        args.GetReturnValue().Set(javaScriptMethodList);
+    }
+
     void Proxy::Call(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
@@ -221,7 +275,7 @@ namespace ObjC {
 
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
 
-        SEL sel = resolveSelector(obj->obj_, ValueToChar(isolate, args[0]));
+        SEL sel = sel_getUid(ValueToChar(isolate, args[0]));
 
         Method method;
 
@@ -549,7 +603,7 @@ namespace ObjC {
         HandleScope scope(isolate);
 
         Proxy *obj = ObjectWrap::Unwrap<Proxy>(args.This());
-        SEL sel = resolveSelector(obj->obj_, ValueToChar(isolate, args[0]));
+        SEL sel = sel_getUid(ValueToChar(isolate, args[0]));
 
         Method method;
 

@@ -32,6 +32,9 @@ namespace ObjC {
         static void Description(const FunctionCallbackInfo<Value>& args);
         static void IsNil(const FunctionCallbackInfo<Value> &args);
 
+        static void Methods(const FunctionCallbackInfo<Value> &args);
+        static void HasMethod(const FunctionCallbackInfo<Value> &args);
+
     private:
         ~Proxy();
         id obj_;

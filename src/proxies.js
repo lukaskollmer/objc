@@ -1,3 +1,5 @@
+
+const possibleSelectors = require('./possible-selectors');
 function ObjCProxy(object) {
   let pointer = object;
   return new Proxy(object, {
@@ -34,10 +36,12 @@ function ObjCProxy(object) {
           let type = pointer.type() === 0 ? 'Class' : 'Instance';
           return `[objc.${type}Proxy ${description}]`;
         };
-      }
-
-      if (name === '__ptr') {
+      } else if (name === '__ptr') {
         return pointer;
+      } else if (name === '__instanceMethods') {
+        return pointer.methods('instance');
+      } else if (name === '__classMethods') {
+        return pointer.methods('class');
       }
 
       return new MethodProxy(pointer, name);
@@ -60,8 +64,13 @@ function MethodProxy(object, methodName) {
     },
 
     apply: (target, thisArg, argv) => {
-      let retval = object.call(methodName, ...argv);
-      let returnType = object.returnTypeOfMethod(methodName);
+      let type = object.type() === 0 ? 'class' : 'instance';
+      let methods = object.methods(type);
+
+      let selector = possibleSelectors(methodName).filter(sel => methods.includes(sel))[0];
+
+      let retval = object.call(selector, ...argv);
+      let returnType = object.returnTypeOfMethod(selector);
 
       if (returnType === '@' && typeof retval === 'object') { // Why check for object type as well? Because some objects (like NSString, NSNumber, etc) are returned as native JS values
         return new ObjCProxy(retval);
