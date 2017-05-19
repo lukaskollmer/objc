@@ -4,35 +4,35 @@ const objc = require('./src/index.js');
 
 test('string creation', t => {
   const NSString = objc.NSString;
-  let string = NSString.stringWithString_('Hello World');
+  const string = NSString.stringWithString_('Hello World');
   t.is(String(string), 'Hello World');
 });
 
 test('primitive return values', t => {
   const NSString = objc.NSString;
-  let string = NSString.stringWithString_('I am the doctor');
-  let length = string.length();
+  const string = NSString.stringWithString_('I am the doctor');
+  const length = string.length();
   t.is(length, 15);
   t.is(typeof length, 'number');
 });
 
 test('load constant w/out bundle', t => {
   objc.import('AppKit');
-  let NSFontAttributeName = objc.constant('NSFontAttributeName');
+  const NSFontAttributeName = objc.constant('NSFontAttributeName');
 
   t.is(NSFontAttributeName, 'NSFont');
 });
 
 test('load constant w/ bundle', t => {
   objc.import('AppKit');
-  let NSFontAttributeName = objc.constant('NSFontAttributeName', 'AppKit');
+  const NSFontAttributeName = objc.constant('NSFontAttributeName', 'AppKit');
 
   t.is(NSFontAttributeName, 'NSFont');
 });
 
 test('load constant w/ full bundle name', t => {
   objc.import('AppKit');
-  let NSFontAttributeName = objc.constant('NSFontAttributeName', 'com.apple.AppKit');
+  const NSFontAttributeName = objc.constant('NSFontAttributeName', 'com.apple.AppKit');
 
   t.is(NSFontAttributeName, 'NSFont');
 });
@@ -41,8 +41,8 @@ test('get username using NSProcessInfo, convert to javascript string and compare
   const NSProcessInfo = objc.NSProcessInfo;
   const os = require('os');
 
-  let processInfo = NSProcessInfo.processInfo();
-  let username = processInfo.userName();
+  const processInfo = NSProcessInfo.processInfo();
+  const username = processInfo.userName();
 
   t.is(String(username), os.userInfo().username);
 });
@@ -50,26 +50,26 @@ test('get username using NSProcessInfo, convert to javascript string and compare
 test('primitive argument types', t => {
   const NSNumber = objc.NSNumber;
 
-  let number = NSNumber.numberWithInt_(5);
+  const number = NSNumber.numberWithInt_(5);
 
   t.is(Number(number), 5);
 });
 
 test('inout parameters 1 (^@)', t => {
   const NSFileManager = objc.NSFileManager;
-  let fm = NSFileManager.defaultManager();
+  const fm = NSFileManager.defaultManager();
 
   const filepath = '/Library/Caches/randomfilenamethatsurelydoesntexust.hey';
   fm.createFileAtPath_contents_attributes_(filepath, null, null);
 
-  let error1 = objc.ref(null);
-  let success1 = fm.removeItemAtPath_error_(filepath, error1);
+  const error1 = objc.ref(null);
+  const success1 = fm.removeItemAtPath_error_(filepath, error1);
 
   t.is(success1, true);
   t.is(typeof objc.deref(error1), 'undefined');
 
-  let error2 = objc.ref(null);
-  let success2 = fm.removeItemAtPath_error_(filepath, error2);
+  const error2 = objc.ref(null);
+  const success2 = fm.removeItemAtPath_error_(filepath, error2);
 
   t.is(success2, false);
   t.is(typeof objc.deref(error2), 'object');
@@ -78,38 +78,38 @@ test('inout parameters 1 (^@)', t => {
 test('inout parameters 2 (^@)', t => {
   const NSDictionary = objc.NSDictionary;
   const NSAppleScript = objc.NSAppleScript;
-  let source = 'telll application "Safari" to get URL of current tab of window 1';
+  const source = 'telll application "Safari" to get URL of current tab of window 1';
 
-  let script = NSAppleScript.alloc().initWithSource_(source);
+  const script = NSAppleScript.alloc().initWithSource_(source);
 
-  let error = objc.ref(null);
-  let success = script.compileAndReturnError_(error);
+  const error = objc.ref(null);
+  const success = script.compileAndReturnError_(error);
 
   t.is(success, false);
   t.is(objc.deref(error).isKindOfClass_(NSDictionary), true);
 });
 
 test('Automatic array conversion (JS array -> NSArray)', t => {
-  let NSArray = objc.NSArray;
+  const NSArray = objc.NSArray;
 
-  let inputArray = ['I', 'am', 'the', 'doctor'];
-  let array = NSArray.arrayWithArray_(inputArray);
+  const inputArray = ['I', 'am', 'the', 'doctor'];
+  const array = NSArray.arrayWithArray_(inputArray);
 
   inputArray.forEach((object, index) => {
-    let str1 = String(object);
-    let str2 = String(array.objectAtIndex_(index));
+    const str1 = String(object);
+    const str2 = String(array.objectAtIndex_(index));
     t.is(str1, str2);
   });
 });
 
 test('Iterate over a NSArray', t => {
-  let NSArray = objc.NSArray;
+  const NSArray = objc.NSArray;
 
-  let inputArray = ['hey', 'missy', 'you', 'so', 'fine'];
-  let array = NSArray.arrayWithArray_(inputArray);
+  const inputArray = ['hey', 'missy', 'you', 'so', 'fine'];
+  const array = NSArray.arrayWithArray_(inputArray);
 
-  for (let element of array) {
-    let index = inputArray.indexOf(String(element));
+  for (const element of array) {
+    const index = inputArray.indexOf(String(element));
     inputArray.splice(index, 1);
   }
 
@@ -117,10 +117,10 @@ test('Iterate over a NSArray', t => {
 });
 
 test('Test calling methods that contain underscores', t => {
-  let NSDate = objc.NSDate;
+  const NSDate = objc.NSDate;
 
-  let now = NSDate.date();
-  let web_RFC1123DateString = now._web_RFC1123DateString(); // eslint-disable-line camelcase
+  const now = NSDate.date();
+  const web_RFC1123DateString = now._web_RFC1123DateString(); // eslint-disable-line camelcase
 
   t.is(typeof web_RFC1123DateString, 'object'); // eslint-disable-line camelcase
   t.is(web_RFC1123DateString.isKindOfClass_('NSString'), true); // eslint-disable-line camelcase

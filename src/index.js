@@ -1,5 +1,5 @@
 
-let binding = require('bindings')('objc.node');
+const binding = require('bindings')('objc.node');
 
 const ObjCProxy = require('./proxies').ObjCProxy;
 const ProxyType = require('./enums');

@@ -20,12 +20,12 @@ module.exports = {
   },
 
   classExists: name => {
-    let classPtr = libobjc.objc_getClass(name);
+    const classPtr = libobjc.objc_getClass(name);
     return classPtr !== null && classPtr.address() !== 0;
   },
 
   import: name => {
-    let path = `/System/Library/${name}.framework/${name}`;
+    const path = `/System/Library/${name}.framework/${name}`;
     return new ffi.DynamicLibrary(path);
   },
 
@@ -41,7 +41,7 @@ module.exports = {
   },
 
   deref: object => {
-    let ref = object.ref;
+    const ref = object.ref;
 
     if (typeof ref === 'undefined') {
       return undefined;
@@ -58,13 +58,13 @@ module.exports = {
       } else if (input.isKindOfClass_('NSNumber')) {
         return Number(input);
       } else if (input.isKindOfClass_('NSArray')) {
-        let array = [];
-        for (var i = 0; i < input.count(); i++) {
+        const array = [];
+        for (let i = 0; i < input.count(); i++) {
           array.push(input.objectAtIndex_(i));
         }
         return array;
       } else if (input.isKindOfClass_('NSDate')) {
-        let timeIntervalSince1970 = input.timeIntervalSince1970();
+        const timeIntervalSince1970 = input.timeIntervalSince1970();
         // NSDate returns seconds, but JavaScript expects milliseconds
         return new Date(timeIntervalSince1970 * 1000);
       }
@@ -85,7 +85,7 @@ module.exports = {
         if (input.constructor === Array) {
           return _GetObjCClass('NSArray').arrayWithArray_(input);
         } else if (input.constructor === Date) {
-          let secondsSince1970 = Number(input) / 1000;
+          const secondsSince1970 = Number(input) / 1000;
           return _GetObjCClass('NSDate').dateWithTimeIntervalSince1970_(secondsSince1970);
         }
         return input;

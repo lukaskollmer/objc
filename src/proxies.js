@@ -4,7 +4,7 @@ function ObjCProxy(object) {
   let pointer = object;
   return new Proxy(object, {
     get: (target, name) => {
-      if (name === Symbol.toPrimitive) { // this is called for string substitutions like `obj: ${obj}`
+      if (name === Symbol.toPrimitive) { // This is called for string substitutions like `obj: ${obj}`
         return hint => {
           if (hint === 'string' && pointer.call('isKindOfClass:', 'NSString')) { // NSMutableString
             return pointer.call('UTF8String');
@@ -16,9 +16,9 @@ function ObjCProxy(object) {
       }
 
       if (name === Symbol.iterator) {
-        let enumerator = (new MethodProxy(pointer, 'objectEnumerator'))();
+        const enumerator = (new MethodProxy(pointer, 'objectEnumerator'))();
         return function * () {
-          var nextObject;
+          let nextObject;
           while (nextObject = enumerator.nextObject()) { // eslint-disable-line no-cond-assign
             // nextObject is never `null` or `undefined`
             if (nextObject.__ptr.isNil() === true) {
@@ -31,9 +31,9 @@ function ObjCProxy(object) {
 
       name = String(name);
       if (name === 'Symbol(util.inspect.custom)') {
-        let description = pointer.isNil() ? '<nil>' : pointer.description();
+        const description = pointer.isNil() ? '<nil>' : pointer.description();
         return () => {
-          let type = pointer.type() === 0 ? 'Class' : 'Instance';
+          const type = pointer.type() === 0 ? 'Class' : 'Instance';
           return `[objc.${type}Proxy ${description}]`;
         };
       } else if (name === '__ptr') {
@@ -64,13 +64,13 @@ function MethodProxy(object, methodName) {
     },
 
     apply: (target, thisArg, argv) => {
-      let type = object.type() === 0 ? 'class' : 'instance';
-      let methods = object.methods(type);
+      const type = object.type() === 0 ? 'class' : 'instance';
+      const methods = object.methods(type);
 
-      let selector = possibleSelectors(methodName).filter(sel => methods.includes(sel))[0];
+      const selector = possibleSelectors(methodName).filter(sel => methods.includes(sel))[0];
 
-      let retval = object.call(selector, ...argv);
-      let returnType = object.returnTypeOfMethod(selector);
+      const retval = object.call(selector, ...argv);
+      const returnType = object.returnTypeOfMethod(selector);
 
       if (returnType === '@' && typeof retval === 'object') { // Why check for object type as well? Because some objects (like NSString, NSNumber, etc) are returned as native JS values
         return new ObjCProxy(retval);

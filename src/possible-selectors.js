@@ -1,8 +1,8 @@
 const itertools = require('itertools');
 
 function repeatArray(array, count) {
-  let temp = [];
-  for (var i = 0; i < count; i++) {
+  const temp = [];
+  for (let i = 0; i < count; i++) {
     array.forEach(item => {
       temp.push(item);
     });
@@ -11,7 +11,7 @@ function repeatArray(array, count) {
 }
 
 function arrayAdd(array, other) {
-  let temp = Array(...array);
+  const temp = Array(...array);
   other.forEach(element => {
     temp.push(element);
   });
@@ -21,16 +21,18 @@ function arrayAdd(array, other) {
 const filterDuplicates = input => input.filter((element, index) => input.indexOf(element) === index);
 
 // Caching reduces selector loading from ~ 1.4 ms (first lookup) to ~ 0.15 ms (after first lookup)
-let cache = {};
+const cache = {};
+
+// We should be able to assume that all leading underscores can stay underscores because methods obviously can't start with an argument
 
 function getPossibleSelectorNames(selector) {
   if (!selector.includes('_')) {
     return [selector];
   }
 
-  let split = selector.split('_');
-  let methodName = split.shift();
-  let n = split.length;
+  const split = selector.split('_');
+  const methodName = split.shift();
+  const n = split.length;
 
   if (selector.endsWith(':') || selector.endsWith('_')) {
     split.push('');
@@ -45,16 +47,16 @@ function getPossibleSelectorNames(selector) {
     cache[n] = permutations;
   }
 
-  let selectors = [];
+  const selectors = [];
 
   permutations.forEach(permutation => {
-    let sel = permutation.reduce((acc, val, index) => {
+    const sel = permutation.reduce((acc, val, index) => {
       return acc + val + split[index];
     }, methodName);
     selectors.push(sel);
   });
 
-  var f = filterDuplicates(selectors);
+  const f = filterDuplicates(selectors);
   return f;
 }
 
