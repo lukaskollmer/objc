@@ -334,6 +334,14 @@ test('Type conversion JS -> ObjC: Date', t => {
   t.true(asNSDate.isKindOfClass_(NSDate));
 });
 
+test('Type conversion JS -> ObjC: Unknown', t => {
+
+  const input = {firstName: 'Lukas', lastName: 'Kollmer'};
+  const objcValue = objc.ns(input);
+
+  t.is(objcValue, input);
+});
+
 test('Type conversion ObjC -> JS: String', t => {
   const NSString = objc.NSString;
 
@@ -369,3 +377,18 @@ test('Type conversion ObjC -> JS: Date', t => {
 
   t.true(asDate instanceof Date);
 });
+
+test('Type conversion ObjC -> JS: Unknown', t => {
+  const NSProcessInfo = objc.NSProcessInfo;
+
+  const input = NSProcessInfo.processInfo();
+  const jsValue = objc.js(input);
+
+  t.is(input, jsValue);
+});
+
+test('class exists', t => {
+  t.true(objc.classExists('NSString'));
+  t.false(objc.classExists('ClassThatDoesntExist'));
+});
+
