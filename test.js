@@ -235,6 +235,24 @@ test('Test possible selectors for method with leading underscore and other under
   t.is(selectors.length, 0);
 });
 
+test('description of class proxy', t => {
+  const util = require('util');
+  const NSDate = objc.NSDate;
+
+  const description = util.inspect(NSDate);
+
+  t.is(description, '[objc.ClassProxy NSDate]');
+});
+
+test('description of instance proxy', t => {
+  const util = require('util');
+  const string = objc.NSString.stringWithString_('the north remembers');
+
+  const description = util.inspect(string);
+
+  t.is(description, '[objc.InstanceProxy the north remembers]');
+});
+
 test('description of method proxy', t => {
   const util = require('util');
   const NSDate = objc.NSDate;
