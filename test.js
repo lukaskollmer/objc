@@ -115,3 +115,13 @@ test('Iterate over a NSArray', t => {
 
   t.is(inputArray.length, 0);
 });
+
+test('Test calling methods that contain underscores', t => {
+  let NSDate = objc.NSDate;
+
+  let now = NSDate.date();
+  let web_RFC1123DateString = now._web_RFC1123DateString(); // eslint-disable-line camelcase
+
+  t.is(typeof web_RFC1123DateString, 'object'); // eslint-disable-line camelcase
+  t.is(web_RFC1123DateString.isKindOfClass_('NSString'), true); // eslint-disable-line camelcase
+});
