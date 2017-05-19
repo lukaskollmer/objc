@@ -335,7 +335,6 @@ test('Type conversion JS -> ObjC: Date', t => {
 });
 
 test('Type conversion JS -> ObjC: Unknown', t => {
-
   const input = {firstName: 'Lukas', lastName: 'Kollmer'};
   const objcValue = objc.ns(input);
 
