@@ -16,10 +16,7 @@ NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
 is equivalent to the following JavaScript code:
 
 ```js
-const {
-  NSPasteboard,
-  NSPasteboardTypeString
-} = require('objc');
+const {NSPasteboard, NSPasteboardTypeString} = require('objc');
 
 let pasteboard = NSPasteboard.generalPasteboard();
 pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
