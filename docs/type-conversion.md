@@ -1,5 +1,10 @@
 # Type conversion
 
+**Table of Contents**
+
+- [Automatic type conversion](#automatic-type-conversion)
+- [Type conversion API](#type-conversion-api)
+
 ## Automatic type conversion
 
 When you pass JavaScript objects (like strings, numbers, dates, etc) to an Objective-C method, the `objc` node module will attempt to convert these parameters to the expected Objective-C type.
