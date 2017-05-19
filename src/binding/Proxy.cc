@@ -21,11 +21,6 @@ using std::string;
 
 
 
-template< typename T >
-inline bool is_aligned( T*p, size_t n = alignof(T) ){
-    return 0 == reinterpret_cast<uintptr_t>(p) % n ;
-}
-
 /**
  * This is a small helper class to wrap an `id` object.
  *
@@ -181,12 +176,12 @@ namespace ObjC {
                 uint count = 0;
                 Method* methodList = class_copyMethodList(cls, &count);
 
-                for (int i = 0; i < count; ++i) {
+                for (int i = 0; i < (int)count; ++i) {
                     Method m = methodList[i];
                     methods.insert(sel_getName(method_getName(m)));
                 }
                 free(methodList);
-            } while (cls = class_getSuperclass(cls));
+            } while ((cls = class_getSuperclass(cls)));
 
             return vector<string>(methods.begin(), methods.end());
         };
@@ -215,7 +210,7 @@ namespace ObjC {
 
         Local<Array> javaScriptMethodList = Array::New(isolate, (int) methods.size());
 
-        for (int i = 0; i < methods.size(); ++i) {
+        for (int i = 0; i < (int)methods.size(); ++i) {
             javaScriptMethodList->Set((uint32_t) i, v8String(methods[i].c_str()));
         }
 
@@ -226,25 +221,15 @@ namespace ObjC {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
 
-        Local<ObjectTemplate> TemplateObject = ObjectTemplate::New();
+        Local<ObjectTemplate> TemplateObject = ObjectTemplate::New(isolate);
         TemplateObject->SetInternalFieldCount(1);
 
         Local<String> __ptr_key = v8String("__ptr");
         Local<String> __ref_key = v8String("ref");
 
-        auto isKindOfClass = [](id object, const char *classname) -> bool {
-            return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
-        };
-
-        auto align_upwards = [](id obj, uintptr_t align) -> id {
-            assert(align > 0 && (align & (align - 1)) == 0); /* Power of 2 */
-
-            uintptr_t addr  = (uintptr_t)obj;
-            if (addr % align != 0)
-                addr += align - addr % align;
-            assert(addr >= (uintptr_t)obj);
-            return (id)addr;
-        };
+        //auto isKindOfClass = [](id object, const char *classname) -> bool {
+        //   return objc_call(bool, object, "isKindOfClass:", objc_getClass(classname));
+        //};
 
 
         // Wrap an `id` in a `AlignedObjectWrapper` in a `ObjC::Proxy` in a `Local<Object>` that can be returned by v8
@@ -359,7 +344,7 @@ namespace ObjC {
                 id NSMutableArray = (id)objc_getClass("NSMutableArray");
                 id objcArray = objc_call(id, NSMutableArray, "array");
 
-                for (int j = 0; j < argArray->Length(); ++j) {
+                for (int j = 0; j < (int)argArray->Length(); ++j) {
                     id arrayObject = convertJavaScriptObjectToCorrespondingObjCType(argArray->Get((uint32_t) j), "@");
                     objc_call_noreturn(void, objcArray, "addObject:", arrayObject);
                 }
@@ -436,12 +421,12 @@ namespace ObjC {
 
                 printf("val: %lf\n", res->ToNumber()->Value());
 
-                /*auto ext = arg.As<External>();
+                auto ext = arg.As<External>();
                 printf("ext->Value(): %p\n", ext->Value());
 
 
                 auto ext2 = Local<External>::New(isolate, External::New(isolate, NULL));
-                printf("ext2->Value(): %p\n", ext2->Value());*/
+                printf("ext2->Value(): %p\n", ext2->Value());
 
 
 

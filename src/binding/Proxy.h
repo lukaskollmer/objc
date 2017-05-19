@@ -37,8 +37,10 @@ namespace ObjC {
 
     private:
         ~Proxy();
-        id obj_;
+
         enum Type type_;
+        id obj_;
+
         static Persistent<Function> constructor;
     };
 }
