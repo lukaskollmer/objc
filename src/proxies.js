@@ -1,5 +1,5 @@
-
 const possibleSelectors = require('./possible-selectors');
+
 function ObjCProxy(object) {
   let pointer = object;
   return new Proxy(object, {

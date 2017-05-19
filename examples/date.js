@@ -10,7 +10,7 @@ const {
 let now = NSDate.date();
 console.log(now);
 
- Convert the NSDate object to a JavaScript date
+// Convert the NSDate object to a JavaScript date
 let asJSDate = objc.js(now);
 console.log(asJSDate);
 

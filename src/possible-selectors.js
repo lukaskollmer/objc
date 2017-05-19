@@ -1,31 +1,27 @@
 const itertools = require('itertools');
 
-/**
-TODO: We should probably avoid polluting the global namespace 😬
-*/
-
-Array.prototype.times = function(count) {
+function repeatArray(array, count) {
   let temp = [];
   for (var i = 0; i < count; i++) {
-    this.forEach(item => {
+    array.forEach(item => {
       temp.push(item);
     });
   }
   return temp;
 }
 
-Array.prototype.add = function(array) {
-  let temp = Array(...this);
-  array.forEach(element => {
+function arrayAdd(array, other) {
+  let temp = Array(...array);
+  other.forEach(element => {
     temp.push(element);
-  })
+  });
   return temp;
 }
 
+const filterDuplicates = input => input.filter((element, index) => input.indexOf(element) === index);
 
 // Caching reduces selector loading from ~ 1.4 ms (first lookup) to ~ 0.15 ms (after first lookup)
 let cache = {};
-
 
 function getPossibleSelectorNames(selector) {
   if (!selector.includes('_')) {
@@ -42,16 +38,16 @@ function getPossibleSelectorNames(selector) {
 
   let permutations = cache[n];
   if (permutations === undefined) {
-    permutations = filterDuplicates(itertools.permutationsSync([":", "_"].times(n/2), n)
-      .add([[':'].times(n)])
-      .add([['_'].times(n)]));
+    permutations = filterDuplicates(itertools.permutationsSync(repeatArray([':', '_'], n / 2), n));
+    permutations = arrayAdd(permutations, [repeatArray([':'], n)]);
+    permutations = arrayAdd(permutations, [repeatArray(['_'], n)]);
 
     cache[n] = permutations;
   }
 
   let selectors = [];
 
-  permutations.forEach((permutation) => {
+  permutations.forEach(permutation => {
     let sel = permutation.reduce((acc, val, index) => {
       return acc + val + split[index];
     }, methodName);
@@ -61,7 +57,5 @@ function getPossibleSelectorNames(selector) {
   var f = filterDuplicates(selectors);
   return f;
 }
-
-const filterDuplicates = input => input.filter((element, index) => input.indexOf(element) == index);
 
 module.exports = selector => getPossibleSelectorNames(selector);
