@@ -33,7 +33,20 @@ let count = anObject.numberOfOccurrences_("hello world");
 
 **Note:**
 
-When an Objective-C method expects a `Class` parameter, you can also pass a `String` and the `objc` node module will automatically pass the corresponding `Class` object.
+1. When an Objective-C method expects a `Class` parameter, you can also pass a `String` and the `objc` node module will automatically pass the corresponding `Class` object.
+2. When an Objective-C method returns an `NSString *` object, that string will not be converted to a native JavaScript `String`. Instead, if you want to convert an `NSString *` object to a JavaScript `String`, just pass it to the `String` function:
+
+```js
+let greeting = NSString.stringWithString_("Hello, World!");
+let string = String(greeting); // This is now a native JavaScript string
+```
+
+Same applies to `NSNumber *` instances:
+```js
+let age = NSNumber.numberWithInt_(18);
+let number = Number(age); // This is now a native JavaScript number
+```
+
 
 
 <br>
