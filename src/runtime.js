@@ -15,10 +15,6 @@ function _GetObjCClass(name) {
 }
 
 module.exports = {
-  getClass: name => {
-    return libobjc.objc_getClass(name);
-  },
-
   classExists: name => {
     const classPtr = libobjc.objc_getClass(name);
     return classPtr !== null && classPtr.address() !== 0;
