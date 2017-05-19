@@ -125,3 +125,105 @@ test('Test calling methods that contain underscores', t => {
   t.is(typeof web_RFC1123DateString, 'object'); // eslint-disable-line camelcase
   t.is(web_RFC1123DateString.isKindOfClass_('NSString'), true); // eslint-disable-line camelcase
 });
+
+test('Test possible selectors for 0 underscores', t => {
+  const possibleSelectors = require('./src/possible-selectors');
+
+  const selectors = ['date'];
+
+  possibleSelectors('date').forEach((_, index) => {
+    selectors.splice(index, 1);
+  });
+
+  t.is(selectors.length, 0);
+});
+
+test('Test possible selectors for 1 underscore', t => {
+  const possibleSelectors = require('./src/possible-selectors');
+
+  const selectors = [
+    'performAction:',
+    'performAction_'
+  ];
+
+  possibleSelectors('performAction_').forEach(sel => {
+    const index = selectors.indexOf(sel);
+    selectors.splice(index, 1);
+  });
+
+  t.is(selectors.length, 0);
+});
+
+test('Test possible selectors for 2 underscores', t => {
+  const possibleSelectors = require('./src/possible-selectors');
+
+  const selectors = [
+    'performAction_withObject_',
+    'performAction:withObject_',
+    'performAction_withObject:',
+    'performAction:withObject:'
+  ];
+
+  possibleSelectors('performAction_withObject_').forEach(sel => {
+    const index = selectors.indexOf(sel);
+    selectors.splice(index, 1);
+  });
+
+  t.is(selectors.length, 0);
+});
+
+test('Test possible selectors for 3 underscores', t => {
+  const possibleSelectors = require('./src/possible-selectors');
+
+  const selectors = [
+    'performAction:withObject_afterDelay:',
+    'performAction:withObject_afterDelay_',
+    'performAction:withObject:afterDelay_',
+    'performAction_withObject:afterDelay:',
+    'performAction_withObject:afterDelay_',
+    'performAction_withObject_afterDelay:',
+    'performAction:withObject:afterDelay:',
+    'performAction_withObject_afterDelay_'
+  ];
+
+  possibleSelectors('performAction_withObject_afterDelay_').forEach(sel => {
+    const index = selectors.indexOf(sel);
+    selectors.splice(index, 1);
+  });
+
+  t.is(selectors.length, 0);
+});
+
+test('Test possible selectors for method with leading underscore and no other underscores', t => {
+  const possibleSelectors = require('./src/possible-selectors');
+
+  const selectors = [
+    '_dateString',
+    '_dateString'
+  ];
+
+  possibleSelectors('_dateString').forEach(sel => {
+    const index = selectors.indexOf(sel);
+    selectors.splice(index, 1);
+  });
+
+  t.is(selectors.length, 0);
+});
+
+test('Test possible selectors for method with leading underscore and other underscores', t => {
+  const possibleSelectors = require('./src/possible-selectors');
+
+  const selectors = [
+    '_dateStringForTimeZone_',
+    '_dateStringForTimeZone:',
+    ':dateStringForTimeZone_',
+    ':dateStringForTimeZone:'
+  ];
+
+  possibleSelectors('_dateStringForTimeZone_').forEach(sel => {
+    const index = selectors.indexOf(sel);
+    selectors.splice(index, 1);
+  });
+
+  t.is(selectors.length, 0);
+});
