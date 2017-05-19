@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <set>
+#include <map>
 #include "Proxy.h"
 #include "objc_call.h"
 
@@ -63,6 +64,9 @@ using namespace v8;
 namespace ObjC {
 
     Persistent<Function> Proxy::constructor;
+
+    std::map<string, vector<string>> cachedClassMethods;
+    std::map<string, vector<string>> cachedInstanceMethods;
 
     Proxy::Proxy(enum Type type, id obj) : type_(type), obj_(obj) {}
     Proxy::~Proxy() {}
@@ -188,7 +192,6 @@ namespace ObjC {
         };
 
 
-
         Class classOfObject = ([&](id object) -> Class {
             switch (obj->type_) {
                 case Type::klass: return (Class)object;
@@ -198,8 +201,17 @@ namespace ObjC {
 
 
         Class cls = EQUAL(methodType, "class") ? object_getClass((id)classOfObject) : classOfObject;
+        auto classname = string(class_getName(cls));
 
-        auto methods = getMethodsOfClass(cls);
+        vector<string> methods;
+        auto cachedMethods = (EQUAL(methodType, "class") ? cachedClassMethods : cachedInstanceMethods)[classname];
+
+        if (cachedMethods.size() != 0) {
+            methods = cachedMethods;
+        } else {
+            methods = getMethodsOfClass(cls);
+            (EQUAL(methodType, "class") ? cachedClassMethods : cachedInstanceMethods)[classname] = methods;
+        }
 
         Local<Array> javaScriptMethodList = Array::New(isolate, (int) methods.size());
 
