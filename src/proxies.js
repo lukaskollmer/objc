@@ -11,7 +11,7 @@ function ObjCProxy(object) {
           } else if (hint === 'number' && pointer.call('isKindOfClass:', 'NSNumber')) {
             return pointer.call('doubleValue');
           }
-          return pointer.description();
+          return pointer.description(); // Should never reach here...
         };
       }
 
@@ -47,6 +47,7 @@ function ObjCProxy(object) {
       return new MethodProxy(pointer, name);
     },
 
+    // This only gets invoked from v8
     set: (target, key, value) => {
       if (key === '__ptr') {
         pointer = value;

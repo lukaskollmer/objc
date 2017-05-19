@@ -297,3 +297,39 @@ test('Class instance methods', t => {
   t.true(classMethods.includes('compare:options:range:locale:'));
   t.true(classMethods.includes('getBytes:maxLength:usedLength:encoding:options:range:remainingRange:'));
 });
+
+test('Type conversion JS -> ObjC: String', t => {
+  const NSString = objc.NSString;
+
+  const input = 'trust me. i am the doctor';
+  const asNSString = objc.ns(input);
+
+  t.true(asNSString.isKindOfClass_(NSString));
+});
+
+test('Type conversion JS -> ObjC: Number', t => {
+  const NSNumber = objc.NSNumber;
+
+  const input = 42;
+  const asNSNumber = objc.ns(input);
+
+  t.true(asNSNumber.isKindOfClass_(NSNumber));
+});
+
+test('Type conversion JS -> ObjC: Array', t => {
+  const NSArray = objc.NSArray;
+
+  const input = ['time', 'and', 'relative', 'dimensions', 'in', 'space'];
+  const asNSArray = objc.ns(input);
+
+  t.true(asNSArray.isKindOfClass_(NSArray));
+});
+
+test('Type conversion JS -> ObjC: Date', t => {
+  const NSDate = objc.NSDate;
+
+  const input = new Date('1963-11-23T17:16:20');
+  const asNSDate = objc.ns(input);
+
+  t.true(asNSDate.isKindOfClass_(NSDate));
+});
