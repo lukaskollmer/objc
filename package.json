@@ -42,5 +42,11 @@
   "xo": {
     "space": true,
     "ignore": "examples/*"
+  },
+  "nyc": {
+    "reporter": [
+      "lcov",
+      "text"
+    ]
   }
 }
