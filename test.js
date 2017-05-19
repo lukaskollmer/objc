@@ -234,3 +234,13 @@ test('Test possible selectors for method with leading underscore and other under
 
   t.is(selectors.length, 0);
 });
+
+test('description of method proxy', t => {
+  const util = require('util');
+  const NSDate = objc.NSDate;
+
+  const dateMethod = NSDate.date;
+  const description = util.inspect(dateMethod);
+
+  t.is(description, '[objc.MethodProxy for date]');
+});
