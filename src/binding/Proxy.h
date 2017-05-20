@@ -18,9 +18,9 @@ using node::ObjectWrap;
 namespace ObjC {
     class Proxy : public ObjectWrap {
 
+    public:
         enum class Type { klass, instance };
 
-    public:
         Proxy(Type type, id obj);
         static void Init(Local<Object> exports);
         static void New(const FunctionCallbackInfo<Value>& args);
