@@ -5,12 +5,11 @@
 - [New] Implemented Selector resolving, meaning that you now can call objc methods that contain an underscore
 - [New] Added a bunch of documentation
 - [New] Added a bunch of tests
-
 - [Change] Explicitly require C++14
 - [Change] Removed NodeJS v6.x support (incompatible w/ C++14)
-
 - [Fixed] Fixed the random "misaligned pointer" bug
 - [Fixed] logging an ObjCProxy holding a `nil` object no longer crashes the node process
+
 
 ### v0.3.0 (2017-05-10)
 - Added basic support for inout parameters (like `NSError **`)
