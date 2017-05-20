@@ -12,6 +12,10 @@
       "include_dirs": [
         "<!(node -e \"require('nan')\")",
       ],
+      "cflags": [
+        "-std=c++14",
+        "-stdlib=libc++"
+      ],
       "xcode_settings": {
         "OTHER_CFLAGS": [
           "-std=c++14",
