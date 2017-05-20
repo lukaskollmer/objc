@@ -12,7 +12,7 @@ const {
 } = objc;
 
 let pasteboard = NSPasteboard.generalPasteboard();
-pasteboard.declareTypes_owner_(NSArray.arrayWithObject_(NSPasteboardTypeString), null);
+pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
 
 const get = () => {
   return pasteboard.stringForType_(NSPasteboardTypeString);
