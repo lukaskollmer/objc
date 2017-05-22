@@ -40,6 +40,7 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 
 ## TODO
 This is very much still work in progress and there's a bunch of stuff that either has some bugs or still needs to be implemented. These are key features I'd like to add in the future:
+- [ ] Allow ommiting the last underscore if #args == #underscores + 1
 - [ ] `NSDictionary` ⇆ `Object` conversion
 - [ ] Blocks
 
