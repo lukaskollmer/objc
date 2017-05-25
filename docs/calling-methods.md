@@ -24,3 +24,14 @@ pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
 pasteboard.setString_forType_("44 > 45", NSPasteboardTypeString);
 ```
 
+### Trailing underscores
+
+If a method ends with an underscore (basically all methods that take parameters), you can omit the last underscore.
+
+The following examples are equivalent:
+```js
+const {NSString} = require('objc');
+
+let str1 = NSString.stringWithString_('Hello World');
+let str2 = NSString.stringWithString('Hello World');
+```
