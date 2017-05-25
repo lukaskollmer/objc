@@ -65,6 +65,14 @@ function MethodProxy(object, methodName) {
     },
 
     apply: (target, thisArg, argv) => {
+      // Automatically add an underscore at the end if:
+      // 1. There are more arguments than underscores
+      // 2. The method doesn't end w/ an underscore
+
+      if ((methodName.split('_').length - 1) < argv.length && !methodName.endsWith('_')) {
+        methodName += '_';
+      }
+
       const type = object.type() === 0 ? 'class' : 'instance';
       const methods = object.methods(type);
 
