@@ -391,3 +391,11 @@ test('class exists', t => {
   t.false(objc.classExists('ClassThatDoesntExist'));
 });
 
+test('Trailing underscores in method names can be omitted', t => {
+  const NSString = objc.NSString;
+
+  const str1 = NSString.stringWithString_('Hello World');
+  const str2 = NSString.stringWithString('Hello World');
+
+  t.is(String(str1), String(str2));
+});
