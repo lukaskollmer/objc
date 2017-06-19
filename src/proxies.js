@@ -78,7 +78,13 @@ function MethodProxy(object, methodName) {
 
       const selector = possibleSelectors(methodName).filter(sel => methods.includes(sel))[0];
 
-      const retval = object.call(selector, ...argv);
+      let retval;
+      try {
+        retval = object.call(selector, ...argv);
+      } catch (err) {
+        throw err;
+      }
+
       const returnType = object.returnTypeOfMethod(selector);
 
       if (returnType === '@' && typeof retval === 'object') { // Why check for object type as well? Because some objects (like NSString, NSNumber, etc) are returned as native JS values

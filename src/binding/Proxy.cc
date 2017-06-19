@@ -13,6 +13,10 @@
 #include "Invocation.h"
 #include "utils.h"
 
+extern "C" {
+#include <objc/objc-exception.h>
+}
+
 #define v8String(str) v8::String::NewFromUtf8(isolate, str)
 
 
@@ -487,12 +491,55 @@ namespace ObjC {
             }
         }
 
+        //
+        // Setup Error Handling
+        //
+
+        // Why are we using `objc_setExceptionPreprocessor`?
+        // 1. `objc_setUncaughtExceptionHandler` always terminates the process, meaning that, even if an exception is caught in JS land,
+        //    node will still crash
+        // 2. To prevent v8 (and node) from crashing, we NEED to call `invocation.Invoke` in a `try {}` block.
+        //    (which means that `objc_setUncaughtExceptionHandler` wouldn't get called since the exception isn't uncaught anymore)
+        // 3. `objc_addExceptionHandler` doesn't seem to work at all
+
+        // The way this is currently implemented is that we abuse the exception preprocessor to do the actual exception handling
+        // This works because the preprocessor is always called, even if the exception is caught.
+        // In the preprocessor, we simply throw a regular JS exception which is caught in JS land and then rethrown to get a nicer stacktrace
+        // TODO: Maybe provide an objc stacktrace as well?
+
+        auto objc_exception_preprocessor = + [] (id exc) -> id {
+            Isolate *isolate = Isolate::GetCurrent();
+
+            auto exc_name_obj = objc_call(id, exc, "name");
+            auto exc_name_str = objc_call(const char*, exc_name_obj, "UTF8String");
+
+            auto exc_reason_obj = objc_call(id, exc, "reason");
+            auto exc_reason_str = objc_call(const char*, exc_reason_obj, "UTF8String");
+
+            std::string exceptionMessage(exc_name_str);
+            exceptionMessage.append(" ");
+            exceptionMessage.append(exc_reason_str);
+
+            auto errorMessage = v8::String::NewFromUtf8(isolate, exceptionMessage.c_str());
+
+            isolate->ThrowException(Exception::Error(errorMessage));
+
+            return exc;
+        };
+
+        objc_setExceptionPreprocessor(objc_exception_preprocessor);
+
 
         //
         // Invoke
         //
 
-        invocation.Invoke();
+        try {
+            invocation.Invoke();
+        } catch (...) {
+            args.GetReturnValue().Set(Undefined(isolate));
+            return;
+        }
 
 
 

@@ -12,7 +12,11 @@
       "include_dirs": [
         "<!(node -e \"require('nan')\")",
       ],
+      "defines": [
+        "__OBJC2__=1"
+      ],
       "xcode_settings": {
+        "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
         "OTHER_CFLAGS": [
           "-std=c++14",
           "-stdlib=libc++"

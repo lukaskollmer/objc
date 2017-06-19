@@ -399,3 +399,31 @@ test('Trailing underscores in method names can be omitted', t => {
 
   t.is(String(str1), String(str2));
 });
+
+test('ObjC exception handling', t => {
+  const NSMutableArray = objc.NSMutableArray;
+
+  const array = NSMutableArray.array();
+
+  array.addObject_('Hello');
+  array.addObject_('World');
+
+  t.throws(() => {
+    array.addObject_(null);
+  });
+});
+
+test('ObjC exception contains exception info', t => {
+  const NSMutableArray = objc.NSMutableArray;
+
+  const array = NSMutableArray.array();
+
+  array.addObject_('Hello');
+  array.addObject_('World');
+
+  try {
+    array.addObject_(null);
+  } catch (err) {
+    t.is(err.message, 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil');
+  }
+});
