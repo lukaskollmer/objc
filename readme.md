@@ -32,6 +32,7 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 
 - [API](https://lukaskollmer.github.io/objc/api.html)
 - [Calling methods](https://lukaskollmer.github.io/objc/calling-methods.html)
+- [Exception handling](https://lukaskollmer.github.io/objc/exception-handling.html)
 - [Loading ObjC constants](https://lukaskollmer.github.io/objc/loading-objc-constants.html)
 - [Pass by reference](https://lukaskollmer.github.io/objc/pass-by-reference.html)
 - [Type conversion](https://lukaskollmer.github.io/objc/type-conversion.html)
@@ -40,7 +41,6 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 
 ## TODO
 This is very much still work in progress and there's a bunch of stuff that either has some bugs or still needs to be implemented. These are key features I'd like to add in the future:
-- [ ] Allow ommiting the last underscore if #args == #underscores + 1
 - [ ] `NSDictionary` ⇆ `Object` conversion
 - [ ] Blocks
 
