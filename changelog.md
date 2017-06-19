@@ -1,5 +1,8 @@
-### v0.4.0 (2017-05-20)
+### v0.5.0 (2017-05-19)
+- Exception handling
+- Allow omitting the last underscore in method calls
 
+### v0.4.0 (2017-05-20)
 **New**
 - JavaScript Arrays passed to ObjC methods will now automatically be converted to `NSArray *` instances
 - Added `objc.ns` and `objc.js` functions to convert compatible objects (`String` <-> `NSString`, `Date` <-> `SDate`, etc.)
@@ -15,7 +18,6 @@
 **Fixed**
 - Fixed the random "misaligned pointer" bug
 - Logging an ObjCProxy holding a `nil` object no longer crashes the node process
-
 
 ### v0.3.0 (2017-05-10)
 - Added basic support for inout parameters (like `NSError **`)
