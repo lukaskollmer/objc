@@ -85,7 +85,7 @@ namespace ObjC {
 
         auto argc = (int) block->argumentTypes.size();
 
-        Local<Value> argv[argc];
+        Local<Value> *argv = new Local<Value>[argc];
 
         va_list ap;
         va_start(ap, block);
@@ -147,6 +147,8 @@ namespace ObjC {
 
         // TODO: Maybe map `this` in the block (presumably the first argument) to the block itself???
         Local<Value> retVal = function->Call(isolate->GetCallingContext()->Global(), argc, argv);
+
+        delete [] argv;
 
 
         //
