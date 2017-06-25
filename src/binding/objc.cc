@@ -1,6 +1,7 @@
 #include <node.h>
 
 #include "Proxy.h"
+#include "Block.h"
 #include "constants.h"
 #include "utils.h"
 
@@ -24,6 +25,7 @@ namespace ObjC {
 
     void Initialize(Local<Object> exports) {
         ObjC::Proxy::Init(exports);
+        ObjC::Block::Init(exports);
 
         NODE_SET_METHOD(exports, "constant", GetConstant);
     }

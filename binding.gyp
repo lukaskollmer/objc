@@ -5,6 +5,7 @@
       "sources": [
         "src/binding/objc.cc",
         "src/binding/Proxy.cc",
+        "src/binding/Block.cc",
         "src/binding/utils.cc",
         "src/binding/Invocation.cc",
         "src/binding/constants.cpp"

@@ -10,6 +10,7 @@
 
 extern "C" {
 #include <objc/runtime.h>
+#include <Block.h>
 };
 
 using namespace v8;
@@ -34,6 +35,10 @@ namespace ObjC {
 
         static void Methods(const FunctionCallbackInfo<Value> &args);
         static void HasMethod(const FunctionCallbackInfo<Value> &args);
+
+        static Local<Object> CreateNewObjCWrapperFrom(id obj);
+
+        id GetWrappedObject() { return obj_; }
 
     private:
         ~Proxy();

@@ -15,6 +15,8 @@ function _GetObjCClass(name) {
 }
 
 module.exports = {
+  Block: binding.Block,
+  Proxy: ObjCProxy,
   classExists: name => {
     const classPtr = libobjc.objc_getClass(name);
     return classPtr !== null && classPtr.address() !== 0;

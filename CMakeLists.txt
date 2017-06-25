@@ -13,7 +13,7 @@ set(SOURCE_FILES
         src/binding/Invocation.cc
         src/binding/Invocation.h
         src/binding/constants.cpp
-        src/binding/constants.h)
+        src/binding/constants.h src/binding/Block.cc src/binding/Block.h)
 
 include_directories(
         /usr/local/include/node/
