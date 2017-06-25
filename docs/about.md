@@ -31,6 +31,7 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 
 - [API](https://lukaskollmer.github.io/objc/api.html)
 - [Calling methods](https://lukaskollmer.github.io/objc/calling-methods.html)
+- [Blocks](https://lukaskollmer.github.io/objc/blocks.html)
 - [Exception handling](https://lukaskollmer.github.io/objc/exception-handling.html)
 - [Loading ObjC constants](https://lukaskollmer.github.io/objc/loading-objc-constants.html)
 - [Pass by reference](https://lukaskollmer.github.io/objc/pass-by-reference.html)
