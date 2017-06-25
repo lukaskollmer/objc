@@ -1,3 +1,6 @@
+### v0.6.0 (2017-06-25)
+- Added Block support
+
 ### v0.5.0 (2017-06-19)
 - Exception handling
 - Allow omitting the last underscore in method calls
