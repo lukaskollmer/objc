@@ -38,8 +38,6 @@ namespace ObjC {
 
     class Block : public ObjectWrap {
     public:
-        enum class Type { klass, instance };
-
         static void Init(Local<Object> exports);
         static void New(const FunctionCallbackInfo<Value>& args);
 
