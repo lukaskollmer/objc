@@ -1,4 +1,4 @@
-### v0.5.0 (2017-05-19)
+### v0.5.0 (2017-06-19)
 - Exception handling
 - Allow omitting the last underscore in method calls
 
