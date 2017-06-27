@@ -36,7 +36,7 @@ namespace ObjC {
         static void Methods(const FunctionCallbackInfo<Value> &args);
         static void HasMethod(const FunctionCallbackInfo<Value> &args);
 
-        static Local<Object> CreateNewObjCWrapperFrom(id obj);
+        static Local<Object> CreateNewObjCWrapperFrom(Isolate* isolate, id obj);
 
         id GetWrappedObject() { return obj_; }
 

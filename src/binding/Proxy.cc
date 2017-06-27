@@ -483,7 +483,7 @@ namespace ObjC {
             id unwrappedArg = *arg;
 
             if (unwrappedArg != nil) {
-                auto wrappedValue = CreateNewObjCWrapperFrom(unwrappedArg);
+                auto wrappedValue = CreateNewObjCWrapperFrom(isolate, unwrappedArg);
                 args[javaScriptArgumentIndex]->ToObject()->Set(__ref_key, wrappedValue);
             } else {
                 // TODO test this
@@ -502,7 +502,7 @@ namespace ObjC {
         if (EQUAL(returnType, "@")) {
             id retval = (id) malloc(sizeof(id));
             invocation.GetReturnValue(&retval);
-            args.GetReturnValue().Set(CreateNewObjCWrapperFrom(retval));
+            args.GetReturnValue().Set(CreateNewObjCWrapperFrom(isolate, retval));
             // TODO consider wrapping the return value from CreateNewObjCWrapperFrom in a `Local<Value>::New(...)`. That's used in the block implementation and fixed a bunch of issues (same object for all arguments)
 
             return;
@@ -599,8 +599,7 @@ namespace ObjC {
     //     └── ObjC::Proxy
     //         └── id
     // (sorry)
-    Local<Object> Proxy::CreateNewObjCWrapperFrom(id obj) {
-        Isolate* isolate = Isolate::GetCurrent();
+    Local<Object> Proxy::CreateNewObjCWrapperFrom(Isolate* isolate, id obj) {
         HandleScope scope(isolate);
 
         Local<ObjectTemplate> TemplateObject = ObjectTemplate::New(isolate);
