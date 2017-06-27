@@ -12,6 +12,11 @@
 using namespace std;
 
 namespace ObjC {
+
+    // Forward declaration
+    void* block_invoke(struct __block_literal* block, ...);
+
+
     Persistent<Function> Block::constructor;
 
     void Block::Init(Local<Object> exports) {
@@ -74,10 +79,22 @@ namespace ObjC {
         args.GetReturnValue().Set(args.This());
     }
 
-    void* block_invoke(struct __block_literal* block, ...) {
+    struct __block_literal* Block::ToBlockLiteral() {
 
-        Isolate *isolate = Isolate::GetCurrent();
-        HandleScope scope(isolate);
+        auto block_literal = new __block_literal;
+        block_literal->isa      = _NSConcreteGlobalBlock;
+        block_literal->flags    = (1<<28);
+        block_literal->invoke = (void*) block_invoke;
+        block_literal->isolate = Isolate::GetCurrent();
+        block_literal->function = function;
+        block_literal->returnType = this->returnTypeEncoding;
+        block_literal->argumentTypes = this->argumentTypeEncodings;
+
+        return block_literal;
+    }
+
+    void* block_invoke(struct __block_literal* block, ...) {
+        Isolate *isolate = block->isolate;
 
         //
         // Handle Arguments
@@ -96,11 +113,19 @@ namespace ObjC {
     type arg = va_arg(ap, type); \
     argv[i] = Local<Value>::New(isolate, v8::Number::New(isolate, arg));
 
+#define HANDLE_ARGTYPE_CAST(type, castedType) \
+    type arg = va_arg(ap, type); \
+    argv[i] = Local<Value>::New(isolate, v8::Number::New(isolate, (castedType)arg));
+
             if (ARGTYPE("@")) {
                 id arg = va_arg(ap, id);
-                argv[i] = Local<Value>::New(isolate, Proxy::CreateNewObjCWrapperFrom(arg));
+                if (arg != nullptr) {
+                    argv[i] = Local<Value>::New(isolate, Proxy::CreateNewObjCWrapperFrom(isolate, arg));
+                } else {
+                    argv[i] = Local<Value>::New(isolate, Null(isolate));
+                }
             } else if (ARGTYPE("c")) { // char
-                HANDLE_ARGTYPE(char)
+                HANDLE_ARGTYPE_CAST(char, int32_t)
             } else if (ARGTYPE("i")) { // int
                 HANDLE_ARGTYPE(int)
             } else if (ARGTYPE("s")) { // short
@@ -213,20 +238,5 @@ namespace ObjC {
 #undef BLOCK_RETURNS
 
         return nullptr;
-    }
-
-
-
-    struct __block_literal* Block::ToBlockLiteral() {
-
-        auto block_literal = new __block_literal;
-        block_literal->isa      = _NSConcreteGlobalBlock;
-        block_literal->flags    = (1<<28);
-        block_literal->function = function;
-        block_literal->invoke = (void*) block_invoke;
-        block_literal->returnType = this->returnTypeEncoding;
-        block_literal->argumentTypes = this->argumentTypeEncodings;
-
-        return block_literal;
     }
 }

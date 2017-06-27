@@ -24,6 +24,7 @@ namespace ObjC {
         void *invoke;
         struct __block_descriptor_1 *descriptor;
         // Custom Fields
+        v8::Isolate *isolate;
         PersistentBlockFunction function; // Custom field to make the wrapped JS function available. (TODO: Should this be put in the descriptor?)
         const char* returnType;
         std::vector<const char*> argumentTypes;
