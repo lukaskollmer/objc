@@ -12,7 +12,8 @@ const block = new objc.Block(() => {
 When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters. The `objc` module will use this information to automatically convert values to the expected type.
 
 **Note**  
-When a block takes an Objective-C object as its parameter, you'll need to manually wrap that object in an `objc.Proxy`.
+1. When a block takes an Objective-C object as its parameter, you'll need to manually wrap that object in an `objc.Proxy`.
+2. This currently only supports blocks that are executed on the main thread
 
 <br>
 
