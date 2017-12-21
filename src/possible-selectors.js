@@ -1,63 +1,48 @@
-const itertools = require('itertools');
 
-function repeatArray(array, count) {
-  const temp = [];
-  for (let i = 0; i < count; i++) {
-    array.forEach(item => {
-      temp.push(item);
-    });
-  }
-  return temp;
-}
 
-function arrayAdd(array, other) {
-  const temp = Array(...array);
-  other.forEach(element => {
-    temp.push(element);
-  });
-  return temp;
-}
-
-const filterDuplicates = input => input.filter((element, index) => input.indexOf(element) === index);
-
-// Caching reduces selector loading from ~ 1.4 ms (first lookup) to ~ 0.15 ms (after first lookup)
+// Caching reduces selector permutation generation from ~ 0.3 ms (first lookup) to ~ 0.05 ms (after first lookup)
 const cache = {};
 
-// We should be able to assume that all leading underscores can stay underscores because methods obviously can't start with an argument
 
-function getPossibleSelectorNames(selector) {
+const joinSelectorWithPossiblePermutations = (selector, permutations) => {
+  const split = selector.split('_');
+  const methodName = split.shift();
+
+  let selectors = [];
+  permutations.forEach(permutation => {
+    selectors.push(permutation.reduce((acc, val, index) => { return acc + val + split[index] }, methodName));
+  });
+
+  return selectors;
+}
+
+
+const getPossibleSelectorNames = selector => {
   if (!selector.includes('_')) {
     return [selector];
   }
 
-  const split = selector.split('_');
-  const methodName = split.shift();
-  const n = split.length;
-
-  if (selector.endsWith(':') || selector.endsWith('_')) {
-    split.push('');
-  }
+  const n = selector.split('_').length - 1;
 
   let permutations = cache[n];
-  if (permutations === undefined) {
-    permutations = filterDuplicates(itertools.permutationsSync(repeatArray([':', '_'], n / 2), n));
-    permutations = arrayAdd(permutations, [repeatArray([':'], n)]);
-    permutations = arrayAdd(permutations, [repeatArray(['_'], n)]);
 
-    cache[n] = permutations;
+  if (typeof permutations !== 'undefined') {
+    return joinSelectorWithPossiblePermutations(selector, permutations);
   }
 
-  const selectors = [];
+  permutations = [];
 
-  permutations.forEach(permutation => {
-    const sel = permutation.reduce((acc, val, index) => {
-      return acc + val + split[index];
-    }, methodName);
-    selectors.push(sel);
-  });
+  const numberOfPermutations = Math.pow(2, n);
+  for (let i = 0; i < numberOfPermutations; i++) {
+    permutations.push([]);
+    for (let j = 0; j < n; j++) {
+      const bitIsSet = (i & (1 << j)) != 0;
+      permutations[i][j] = bitIsSet ? '_' : ':';
+    }
+  }
 
-  const f = filterDuplicates(selectors);
-  return f;
+  cache[n] = permutations;
+  return joinSelectorWithPossiblePermutations(selector, permutations);
 }
 
 module.exports = selector => getPossibleSelectorNames(selector);
