@@ -14,7 +14,8 @@
     "node": ">=7"
   },
   "scripts": {
-    "test": "xo && nyc ava --verbose",
+    "test": "ava --verbose",
+    "test_": "xo && nyc ava --verbose",
     "start": "node-gyp build && node example.js"
   },
   "keywords": [
