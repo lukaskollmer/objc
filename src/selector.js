@@ -1,4 +1,4 @@
-
+const runtime = require('./runtime');
 
 // Caching reduces selector permutation generation from ~ 0.3 ms (first lookup) to ~ 0.05 ms (after first lookup)
 const cache = {};
@@ -45,4 +45,22 @@ const getPossibleSelectorNames = selector => {
   return joinSelectorWithPossiblePermutations(selector, permutations);
 }
 
-module.exports = selector => getPossibleSelectorNames(selector);
+
+
+
+class Selector {
+  constructor(name) {
+    this.ptr = runtime.sel_getUid(name);
+  }
+
+  get name() {
+    return runtime.sel_getName(this.ptr);
+  }
+
+
+  permutations() {
+    return getPossibleSelectorNames(this.name).map(p => new Selector(p));
+  }
+}
+
+module.exports = Selector;

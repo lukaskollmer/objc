@@ -1,6 +1,98 @@
-const possibleSelectors = require('./possible-selectors');
+const Selector = require('./selector');
+const util = require('util');
 
-function ObjCProxy(object) {
+
+
+
+
+function InstanceProxy(object) {
+  let self = object;
+
+  return new Proxy({}, {
+    get: (_, key) => {
+
+      if (key === util.inspect.custom) {
+        return (depth, options) => {
+          return `[objc.InstanceProxy ${self.description()}]`;
+        }
+      } else if (key === Symbol.toPrimitive) {
+        return hint => {
+          if (hint === 'string') {
+            return self.description();
+          } else if (hint === 'number') {
+            // todo implement this
+            return -1;
+          }
+        }
+      } else if (key === Symbol.iterator) {
+        const isKindOfClass = MethodProxy(self, 'isKindOfClass_');
+
+        // PLOT TWIST: what if self is already an enumerator? // TODO
+        let enumerator;
+
+        if (isKindOfClass('NSArray')) {
+          enumerator = MethodProxy(self, 'objectEnumerator')();
+        } else if (isKindOfClass('NSDictionary')) {
+          // TODO should we enumerate over the keys or values, or should we return tuples???
+          enumerator = MethodProxy(self, 'keyEnumerator')();
+        }
+
+        return function*() {
+          let nextObject;
+          while ((nextObject = enumerator.nextObject()) && !nextObject.ptr.isNull()) {
+            yield nextObject;
+          }
+        }
+      }
+
+
+      // might be a Symbol
+      key = String(key);
+
+      if (key === 'ptr') {
+        return self.ptr;
+      }
+
+
+      return MethodProxy(self, key);
+
+    }
+  })
+}
+
+
+const MethodProxy = (object, selector) => {
+  const self = object;
+  return new Proxy(() => {}, {
+    get: (_, key) => {
+      if (key === util.inspect.custom) {
+        return (depth, options) => `[objc.MethodProxy '${self.type === 'class' ? '+' : '-'}[${object.class()} ${selector}]']`;
+      }
+    },
+
+    apply: (target, _this, args) => {
+      //console.log(`will call ${selector} on ${self.description()}`);
+
+
+      // Add a trailing underscore to the selector if:
+      // 1. There are more arguments than underscores
+      // 2. The method doesn't already end w/ an underscore
+      if ((selector.split('_').length - 1) < args.length && !selector.endsWith('_')) {
+        selector += '_';
+      }
+
+      return self.call(new Selector(selector), ...args);
+
+    }
+  })
+}
+
+
+
+
+
+
+function ____InstanceProxy(object) {
   let pointer = object;
   return new Proxy(object, {
     get: (target, name) => {
@@ -56,7 +148,7 @@ function ObjCProxy(object) {
   });
 }
 
-function MethodProxy(object, methodName) {
+function ___MethodProxy(object, methodName) {
   return new Proxy(() => {}, {
     get: (target, name) => {
       if (name === 'inspect') {
@@ -88,7 +180,7 @@ function MethodProxy(object, methodName) {
       const returnType = object.returnTypeOfMethod(selector);
 
       if (returnType === '@' && typeof retval === 'object') { // Why check for object type as well? Because some objects (like NSString, NSNumber, etc) are returned as native JS values
-        return new ObjCProxy(retval);
+        return new ____InstanceProxy(retval);
       }
 
       // Problem: objc BOOLs are encoded as char (c). this means that the c++ binding will never cast the return value to a BOOL.
@@ -102,6 +194,8 @@ function MethodProxy(object, methodName) {
 }
 
 module.exports = {
-  ObjCProxy,
+  ____InstanceProxy,
+  InstanceProxy,
+  ___MethodProxy,
   MethodProxy
 };
