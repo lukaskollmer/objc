@@ -18,7 +18,7 @@ var __block_descriptor = struct({
 
 
 class Block {
-	constructor(fn, returnType, argumentTypes) {
+  constructor(fn, returnType, argumentTypes) {
 
     if (typeof fn !== 'function' || typeof returnType !== 'string' || argumentTypes === undefined) {
       throw new TypeError('Invalid arguments passed to Block constructor');
@@ -29,9 +29,9 @@ class Block {
     this.argumentTypes = argumentTypes;
     this.argumentTypes.splice(0, 0, '@'); // 1st argument is the block itself
     this.argumentTypes = this.argumentTypes.map(type => types[type]);
-	}
+  }
 
-	makeBlock() {
+  makeBlock() {
     const self = this;
     var callback = ffi.Callback(this.returnType, this.argumentTypes, function() {
       // call the block implementation, skipping the 1st parameter (the block itself)
@@ -47,7 +47,7 @@ class Block {
     //block.descriptor = ... // TODO can we get away w/out setting the descriptor?
 
     return block.ref();
-	}
+  }
 }
 
 module.exports = Block;
