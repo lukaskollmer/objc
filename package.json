@@ -15,8 +15,7 @@
   },
   "scripts": {
     "test": "ava --verbose",
-    "test_": "xo && nyc ava --verbose",
-    "start": "node-gyp build && node example.js"
+    "test_": "xo && nyc ava --verbose"
   },
   "keywords": [
     "objc",
