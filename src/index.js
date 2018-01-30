@@ -23,6 +23,10 @@ module.exports = new Proxy({}, {
       return builtins[key];
     }
 
-    return builtins.wrap(key);
+    if (runtime.classExists(key)) {
+      return builtins.wrap(key);
+    } else {
+      throw new Error(`Unable to find class '${key}'`);
+    }
   }
 });

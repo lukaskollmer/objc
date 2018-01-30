@@ -74,10 +74,6 @@ class Instance {
     // to decide whether we should convert strings to NSStrings or classes w/ that name)
     const argumentTypes = [...Array(expectedNumberOfArguments).keys()].map(i => {
       const expected = runtime.method_copyArgumentType(method, i);
-      if (expected === '^@') {
-        console.log('REF');
-        return ref.refType('pointer');
-      }
       return types[expected];
     });
 
