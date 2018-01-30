@@ -427,34 +427,34 @@ test('ObjC exception contains exception info', t => {
   }
 });
 
-test.skip('Blocks: Sort NSString* array by length, longest to shortest', t => {
+test('Blocks: Sort NSString* array by length, longest to shortest', t => {
   const NSArray = objc.NSArray;
   const array = NSArray.arrayWithArray_(['I', 'Am', 'The', 'Doctor']);
 
   const block = new objc.Block((obj1, obj2) => {
-    obj1 = new objc.Proxy(obj1);
-    obj2 = new objc.Proxy(obj2);
+    obj1 = objc.wrap(obj1);
+    obj2 = objc.wrap(obj2);
     return obj1.length() > obj2.length() ? -1 : 1;
-  }, ['i', ['@', '@']]);
+  }, 'longlong', ['pointer', 'pointer']);
 
   const sortedArray = array.sortedArrayUsingComparator_(block);
   t.true(sortedArray.isEqualToArray_(['Doctor', 'The', 'Am', 'I']));
 });
 
-test.skip('Blocks: objc.Block throws for missing block type encoding', t => {
+test('Blocks: objc.Block throws for missing block type encoding', t => {
   t.throws(() => {
     const block = new objc.Block(() => {}); // eslint-disable-line no-unused-vars
   });
 });
 
-test.skip('Blocks: objc.Block throws for incomplete block type encoding', t => {
+test('Blocks: objc.Block throws for incomplete block type encoding', t => {
   t.throws(() => {
-    const block = new objc.Block(() => {}, ['v']); // eslint-disable-line no-unused-vars
+    const block = new objc.Block(() => {}, 'void'); // eslint-disable-line no-unused-vars
   });
 });
 
-test.skip('Blocks: objc.Block passes for full block type encoding', t => {
+test('Blocks: objc.Block passes for full block type encoding', t => {
   t.notThrows(() => {
-    const block = new objc.Block(() => {}, ['v', []]); // eslint-disable-line no-unused-vars
+    const block = new objc.Block(() => {}, 'void', []); // eslint-disable-line no-unused-vars
   });
 });
