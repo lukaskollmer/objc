@@ -2,10 +2,6 @@
 
 > NodeJS ⇆ Objective-C bridge _(experimental)_
 
-<br>
-
-**PSA:** _Currently working on a js-only rewrite over in the [js-rewrite](https://github.com/lukaskollmer/objc/tree/js-rewrite) branch_
-
 
 ## Install
 

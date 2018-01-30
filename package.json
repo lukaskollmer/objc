@@ -25,12 +25,8 @@
   ],
   "dependencies": {
     "ffi": "^2.2.0",
-<<<<<<< HEAD
     "ref": "^1.3.5",
     "ref-struct": "^1.1.0"
-=======
-    "ref": "^1.3.5"
->>>>>>> master
   },
   "devDependencies": {
     "ava": "^0.19.1",
