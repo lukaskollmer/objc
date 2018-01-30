@@ -1,6 +1,7 @@
 const ffi = require('ffi');
 const struct = require('ref-struct');
 const runtime = require('./runtime');
+const types = require('./types');
 
 var __block_literal = struct({
   isa: 'pointer',
@@ -24,9 +25,10 @@ class Block {
     }
 
     this.fn = fn;
-    this.returnType = returnType;
+    this.returnType = types[returnType];
     this.argumentTypes = argumentTypes;
-    this.argumentTypes.splice(0, 0, 'pointer'); // 1st argument is the block itself
+    this.argumentTypes.splice(0, 0, '@'); // 1st argument is the block itself
+    this.argumentTypes = this.argumentTypes.map(type => types[type]);
 	}
 
 	makeBlock() {

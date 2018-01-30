@@ -44,7 +44,7 @@ var block = new objc.Block((arg1, arg2) => {
 	arg1 = objc.wrap(arg1);
 	arg2 = objc.wrap(arg2);
 	return arg1.length() < arg2.length() ? -1 : 1;
-}, 'longlong', ['pointer', 'pointer']);
+}, 'q', ['@', '@']);
 
 
 let sortedUsingBlock = array.sortedArrayUsingComparator_(block);
