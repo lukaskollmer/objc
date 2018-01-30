@@ -19,14 +19,14 @@ When creating a block, you need to explicitly declare the type encoding of the b
 
 **Example:** Sort an array by word length, longest to shortest
 ```js
-const {NSArray, Block, Proxy} = require('objc');
+const {NSArray, Block, wrap} = require('objc');
 const array = NSArray.arrayWithArray_(['I', 'Am', 'The', 'Doctor']);
 
 const block = new Block((obj1, obj2) => {
-  obj1 = new Proxy(obj1);
-  obj2 = new Proxy(obj2);
+  obj1 = wrap(obj1);
+  obj2 = wrap(obj2);
   return obj1.length() > obj2.length() ? -1 : 1;
-}, ['i', ['@', '@']]);
+}, ['q', ['@', '@']]);  // NSComparator returns a NSInteger and takes two ids
 
 const sorted = array.sortedArrayUsingComparator_(block);
 // => ['Doctor', 'The', 'Am', 'I']
