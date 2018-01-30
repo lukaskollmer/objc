@@ -1,7 +1,6 @@
 'use strict';
 
 const objc = require('../src/index');
-const ffi = require('ffi');
 
 const {
 	NSArray,
@@ -33,31 +32,27 @@ for (let str of array) {
 
 
 // Add null
-let _array = NSMutableArray.new();
-console.log(_array);
-_array.addObject_(null);
+//let _array = NSMutableArray.new();
+//console.log(_array);
+//_array.addObject_(null);
+
+
 
 // Sort using block
 
-/*
-var callback;
-callback = ffi.Callback('int', ['pointer', 'pointer'],
-  function(obj1, obj2) {
-    console.log('callback');
-		return 1;
-	}
-);
+var block = new objc.Block((arg1, arg2) => {
+	arg1 = objc.wrap(arg1);
+	arg2 = objc.wrap(arg2);
+	return arg1.length() < arg2.length() ? -1 : 1;
+}, 'longlong', ['pointer', 'pointer']);
 
-callback = (obj1, obj2) => {
-	obj1 = new objc.Proxy(obj1);
-	obj2 = new objc.Proxy(obj2);
-
-	return obj1.length() < obj2.length() ? -1 : 1;
-};
-
-const block = new objc.Block(callback, ['i', ['@', '@']]);
 
 let sortedUsingBlock = array.sortedArrayUsingComparator_(block);
-
 console.log(sortedUsingBlock);
-*/
+
+
+
+
+
+
+//s
