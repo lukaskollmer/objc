@@ -93,7 +93,7 @@ You can create a block with the `objc.Block` helper class:
 ```js
 const block = new objc.Block(() => {
   console.log('In the block!');
-}, ['v', []]);
+}, 'v', []);
 ```
 
 When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters. The `objc` module will use this information to automatically convert values to the expected type.
@@ -112,7 +112,7 @@ const block = new Block((obj1, obj2) => {
   obj1 = wrap(obj1);
   obj2 = wrap(obj2);
   return obj1.length() > obj2.length() ? -1 : 1;
-}, ['q', ['@', '@']]);  // NSComparator returns a NSInteger and takes two ids
+}, 'q', ['@', '@']);  // NSComparator returns a NSInteger and takes two ids
 
 const sorted = array.sortedArrayUsingComparator_(block);
 // => ['Doctor', 'The', 'Am', 'I']
