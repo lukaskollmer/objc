@@ -14,8 +14,8 @@
     "node": ">=7"
   },
   "scripts": {
-    "test": "xo && nyc ava --verbose",
-    "start": "node-gyp build && node example.js"
+    "test": "ava --verbose",
+    "test_": "xo && nyc ava --verbose"
   },
   "keywords": [
     "objc",
@@ -24,9 +24,9 @@
     "runtime"
   ],
   "dependencies": {
-    "bindings": "^1.2.1",
     "ffi": "^2.2.0",
-    "ref": "^1.3.5"
+    "ref": "^1.3.5",
+    "ref-struct": "^1.1.0"
   },
   "devDependencies": {
     "ava": "^0.19.1",

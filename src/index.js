@@ -1,22 +1,32 @@
-
-const binding = require('bindings')('objc.node');
-
-const ObjCProxy = require('./proxies').ObjCProxy;
-const ProxyType = require('./enums');
 const runtime = require('./runtime');
+const Instance = require('./instance');
+const convert = require('./convert');
+const Block = require('./block');
 
-runtime.import('Foundation');
+const {InstanceProxy, MethodProxy} = require('./proxies');
 
-module.exports = new Proxy(() => {}, {
-  get: (_, name) => {
-    if (name in runtime) {
-      return runtime[name];
+const builtins = {
+  runtime,
+  Instance,
+  InstanceProxy,
+  MethodProxy,
+  Block,
+  import: runtime.import,
+  js: Instance.js,
+  ns: Instance.ns,
+  wrap: obj => new InstanceProxy(new Instance(obj))
+}
+
+module.exports = new Proxy({}, {
+  get: (_, key) => {
+    if (builtins.hasOwnProperty(key)) {
+      return builtins[key];
     }
 
-    if (runtime.classExists(name)) {
-      return new ObjCProxy(new binding.Proxy(ProxyType.class, name));
+    if (runtime.classExists(key)) {
+      return builtins.wrap(key);
+    } else {
+      throw new Error(`Unable to find class '${key}'`);
     }
-
-    return runtime.constant(name);
   }
 });

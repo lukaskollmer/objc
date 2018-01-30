@@ -1,6 +1,6 @@
 'use strict';
 
-const objc = require('../src/index.js');
+const objc = require('../src/');
 
 const {
 	NSDate,
@@ -20,5 +20,3 @@ console.log(asNSDate);
 
 let localizedDate = NSDateFormatter.localizedStringFromDate_dateStyle_timeStyle_(now, 2, 2);
 console.log(String(localizedDate)); // -> "19. Apr 2017, 22:41:13"
-
-

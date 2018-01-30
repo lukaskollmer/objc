@@ -1,6 +1,6 @@
 'use strict';
 
-const objc = require('../src/index.js');
+const objc = require('../src/index');
 
 const {
 	NSProcessInfo

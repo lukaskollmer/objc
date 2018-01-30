@@ -1,10 +1,10 @@
 'use strict';
 
-const objc = require('../src/index.js');
-const ffi = require('ffi');
+const objc = require('../src/index');
 
 const {
-	NSArray
+	NSArray,
+	NSMutableArray
 } = objc;
 
 let array = NSArray.arrayWithArray_(["Hey", "missy", "you", "so", "fine"]);
@@ -30,25 +30,29 @@ for (let str of array) {
 	//console.log(String(str));
 }
 
+
+// Add null
+//let _array = NSMutableArray.new();
+//console.log(_array);
+//_array.addObject_(null);
+
+
+
 // Sort using block
 
-var callback;
-callback = ffi.Callback('int', ['pointer', 'pointer'],
-  function(obj1, obj2) {
-    console.log('callback');
-		return 1;
-	}
-);
+var block = new objc.Block((arg1, arg2) => {
+	arg1 = objc.wrap(arg1);
+	arg2 = objc.wrap(arg2);
+	return arg1.length() < arg2.length() ? -1 : 1;
+}, 'q', ['@', '@']);
 
-callback = (obj1, obj2) => {
-	obj1 = new objc.Proxy(obj1);
-	obj2 = new objc.Proxy(obj2);
-
-	return obj1.length() < obj2.length() ? -1 : 1;
-};
-
-const block = new objc.Block(callback, ['i', ['@', '@']]);
 
 let sortedUsingBlock = array.sortedArrayUsingComparator_(block);
-
 console.log(sortedUsingBlock);
+
+
+
+
+
+
+//s
