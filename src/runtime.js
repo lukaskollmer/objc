@@ -31,6 +31,8 @@ const importFramework = name => {
 
 importFramework('Foundation');
 
+const getConstant = name => new ffi.DynamicLibrary().get(name);
+
 
 const msgSend = (returnType, argumentTypes) => {
   //console.log(`returnType: ${returnType} argumentTypes: ${argumentTypes}`);
@@ -45,3 +47,4 @@ module.exports = libobjc;
 module.exports.msgSend = msgSend;
 module.exports.import = importFramework;
 module.exports.classExists = classExists;
+module.exports.getConstant = getConstant;

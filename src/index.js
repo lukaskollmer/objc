@@ -1,6 +1,7 @@
 const runtime = require('./runtime');
 const Instance = require('./instance');
 const convert = require('./convert');
+const Block = require('./block');
 
 const {InstanceProxy, MethodProxy} = require('./proxies');
 
@@ -9,9 +10,11 @@ const builtins = {
   Instance,
   InstanceProxy,
   MethodProxy,
+  Block,
   import: runtime.import,
   js: Instance.js,
-  ns: Instance.ns
+  ns: Instance.ns,
+  wrap: obj => new InstanceProxy(new Instance(obj))
 }
 
 module.exports = new Proxy({}, {
@@ -20,6 +23,6 @@ module.exports = new Proxy({}, {
       return builtins[key];
     }
 
-    return new InstanceProxy(new Instance(key));
+    return builtins.wrap(key);
   }
 });

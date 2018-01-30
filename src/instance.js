@@ -3,6 +3,7 @@ const ref = require('ref');
 const Selector = require('./selector');
 const types = require('./types');
 const {InstanceProxy} = require('./proxies');
+const Block = require('./block');
 
 const convert = require('./convert');
 
@@ -85,6 +86,10 @@ class Instance {
 
     args = args.map((arg, idx) => {
       idx += 2;
+
+      if (arg instanceof Block) {
+        return arg.makeBlock();
+      }
 
       if (arg === null) {
         return arg;

@@ -19,5 +19,6 @@ module.exports = {
   '#' : 'pointer',
   ':' : 'pointer',
   '?' : 'pointer',
-  '^@': 'pointer'
+  '^@': 'pointer',
+  '@?': 'pointer'
 }
