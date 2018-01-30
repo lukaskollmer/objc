@@ -18,6 +18,11 @@ var __block_descriptor = struct({
 
 class Block {
 	constructor(fn, returnType, argumentTypes) {
+
+    if (typeof fn !== 'function' || typeof returnType !== 'string' || argumentTypes === undefined) {
+      throw new TypeError('Invalid arguments passed to Block constructor');
+    }
+
     this.fn = fn;
     this.returnType = returnType;
     this.argumentTypes = argumentTypes;
