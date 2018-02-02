@@ -96,7 +96,7 @@ const block = new objc.Block(() => {
 }, 'v', []);
 ```
 
-When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters. The `objc` module will use this information to automatically convert values to the expected type.
+When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters.
 
 **Note**  
 When a block takes an Objective-C object as its parameter, you'll need to manually wrap that object in an `objc.Proxy` (via the `objc.wrap` helper function).
