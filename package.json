@@ -11,7 +11,7 @@
   },
   "main": "./src/index.js",
   "engines": {
-    "node": ">=7"
+    "node": ">=7 <9"
   },
   "scripts": {
     "test": "ava --verbose",
