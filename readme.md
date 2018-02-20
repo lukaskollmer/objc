@@ -118,6 +118,11 @@ const sorted = array.sortedArrayUsingComparator_(block);
 // => ['Doctor', 'The', 'Am', 'I']
 ```
 
+## Roadmap
+In the future, I'd like to add support for:
+- inout parameters (`[obj doSomethingWithError:&error];`)
+- loading `NSString*` constants at runtime
+
 
 ## License
 
