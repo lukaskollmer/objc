@@ -126,4 +126,4 @@ In the future, I'd like to add support for:
 
 ## License
 
-MIT © [Lukas Kollmer](https://lukas.vip)
+MIT © [Lukas Kollmer](https://lukaskollmer.me)
