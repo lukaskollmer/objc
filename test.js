@@ -584,6 +584,18 @@ test('Iterate over a NSArray', t => {
 });
 
 
+test('Iterate over non-enumerable', t => {
+  const {NSObject} = objc;
+
+  const obj = NSObject.new();
+
+  t.throws(() => {
+    for (let element of obj) {
+    }
+  });
+});
+
+
 /*
 Miscellaneous
 */

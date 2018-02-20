@@ -49,6 +49,8 @@ function InstanceProxy(object) {
         } else if (isKindOfClass('NSDictionary')) {
           // TODO should we enumerate over the keys or values, or should we return tuples???
           enumerator = MethodProxy(self, 'keyEnumerator')(); // eslint-disable-line new-cap
+        } else {
+          throw new Error(`Can't iterate over non-enumerable type ${self.class()}`);
         }
 
         return function * () {
