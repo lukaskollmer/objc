@@ -89,14 +89,20 @@ test('description of instance proxy', t => {
   t.is(description, '[objc.InstanceProxy the north remembers]');
 });
 
-test('description of method proxy', t => {
+test('description of class method proxy', t => {
   const util = require('util');
-  const NSDate = objc.NSDate;
+  const method = objc.NSDate.date;
 
-  const dateMethod = NSDate.date;
-  const description = util.inspect(dateMethod);
+  t.is(util.inspect(method), `[objc.MethodProxy '+[NSDate date]']`);
+});
 
-  t.is(description, `[objc.MethodProxy '+[NSDate date]']`);
+test('description of instance method proxy', t => {
+  const util = require('util');
+  const obj = objc.NSObject.new()
+
+  const method = obj.description;
+
+  t.is(util.inspect(method), `[objc.MethodProxy '-[NSObject description]']`);
 });
 
 
