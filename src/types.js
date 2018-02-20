@@ -1,3 +1,5 @@
+/* eslint-disable quote-props, key-spacing */
+
 module.exports = {
   'c' : 'char',
   'i' : 'int32',
@@ -14,11 +16,11 @@ module.exports = {
   'B' : 'int8',
   'v' : 'void',
   '*' : 'string',
-  "r*": 'string',
+  'r*': 'string',
   '@' : 'pointer',
   '#' : 'pointer',
   ':' : 'pointer',
   '?' : 'pointer',
   '^@': 'pointer',
   '@?': 'pointer'
-}
+};

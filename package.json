@@ -14,8 +14,8 @@
     "node": ">=7 <9"
   },
   "scripts": {
-    "test": "ava --verbose",
-    "test_": "xo && nyc ava --verbose"
+    "test_": "ava --verbose",
+    "test": "xo && nyc ava --verbose"
   },
   "keywords": [
     "objc",
@@ -39,7 +39,10 @@
   },
   "xo": {
     "space": true,
-    "ignore": "examples/*"
+    "ignores": [
+      "examples/*",
+      "test.js"
+    ]
   },
   "nyc": {
     "reporter": [

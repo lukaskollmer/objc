@@ -137,10 +137,10 @@ test('Test calling methods that contain underscores', t => {
   const NSDate = objc.NSDate;
 
   const now = NSDate.date();
-  const web_RFC1123DateString = now._web_RFC1123DateString(); // eslint-disable-line camelcase
+  const web_RFC1123DateString = now._web_RFC1123DateString();
 
-  t.is(typeof web_RFC1123DateString, 'object'); // eslint-disable-line camelcase
-  t.is(web_RFC1123DateString.isKindOfClass_('NSString'), true); // eslint-disable-line camelcase
+  t.is(typeof web_RFC1123DateString, 'object');
+  t.is(web_RFC1123DateString.isKindOfClass_('NSString'), true);
 });
 
 test('Test possible selectors for 0 underscores', t => {
@@ -450,18 +450,18 @@ test('Blocks: Sort NSString* array by length, longest to shortest', t => {
 
 test('Blocks: objc.Block throws for missing block type encoding', t => {
   t.throws(() => {
-    const block = new objc.Block(() => {}); // eslint-disable-line no-unused-vars
+    const block = new objc.Block(() => {});
   });
 });
 
 test('Blocks: objc.Block throws for incomplete block type encoding', t => {
   t.throws(() => {
-    const block = new objc.Block(() => {}, 'v'); // eslint-disable-line no-unused-vars
+    const block = new objc.Block(() => {}, 'v');
   });
 });
 
 test('Blocks: objc.Block passes for full block type encoding', t => {
   t.notThrows(() => {
-    const block = new objc.Block(() => {}, 'v', []); // eslint-disable-line no-unused-vars
+    const block = new objc.Block(() => {}, 'v', []);
   });
 });
