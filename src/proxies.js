@@ -44,7 +44,7 @@ function InstanceProxy(object) {
         // PLOT TWIST: what if self is already an enumerator? // TODO
         let enumerator;
 
-        if (isKindOfClass('NSArray')) {
+        if (isKindOfClass('NSArray') || isKindOfClass('NSSet')) {
           enumerator = MethodProxy(self, 'objectEnumerator')(); // eslint-disable-line new-cap
         } else if (isKindOfClass('NSDictionary')) {
           // TODO should we enumerate over the keys or values, or should we return tuples???

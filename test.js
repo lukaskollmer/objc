@@ -161,7 +161,7 @@ test('convert NSNumber to Number', t => {
 test('pass primitive w/out objc counterpart', t => {
   const {NSMutableArray} = objc;
   const array = NSMutableArray.array();
-  
+
   try {
     array.addObject_(() => {});
   } catch (err) {
@@ -600,7 +600,6 @@ test('Iterate over a NSArray', t => {
   t.is(inputArray.length, 0);
 });
 
-
 test('Iterate over a NSDictionary', t => {
   const {NSDictionary} = objc;
 
@@ -614,6 +613,19 @@ test('Iterate over a NSDictionary', t => {
   }
 
   t.deepEqual({}, inputDict);
+});
+
+test('Iterate over a NSSet', t => {
+  const {NSSet} = objc;
+
+  const items = ['a', 'b', 'c']
+  const set = NSSet.setWithArray_(items);
+
+  for (const element of set) {
+    const index = items.indexOf(String(element));
+    items.splice(index, 1);
+  }
+  t.is(items.length, 0);
 });
 
 test('Iterate over non-enumerable', t => {
