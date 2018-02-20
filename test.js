@@ -99,6 +99,13 @@ test.skip('inout parameters 2 (^@)', t => {
   t.is(objc.deref(error).isKindOfClass_(NSDictionary), true);
 });
 
+test('Null return value', t => {
+  const NSDictionary = objc.NSDictionary;
+
+  const dict = NSDictionary.dictionary();
+  t.is(null, dict.objectForKey_('key'));
+});
+
 test('Automatic array conversion (JS array -> NSArray)', t => {
   const NSArray = objc.NSArray;
 

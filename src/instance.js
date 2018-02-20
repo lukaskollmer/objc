@@ -114,12 +114,12 @@ class Instance {
     } catch (e) {
       const exc = new InstanceProxy(new Instance(e));
 
-      let error = new Error(`${exc.name()} ${exc.reason()}`);
-      throw error;
-    } finally {
-
+      throw new Error(`${exc.name()} ${exc.reason()}`);
     }
 
+    if (retval instanceof Buffer && retval.isNull()) {
+      return null;
+    }
 
     if (returnType === '@') {
       return InstanceProxy(new Instance(retval));
