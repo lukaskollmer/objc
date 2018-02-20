@@ -1,3 +1,7 @@
+### v0.11.0 (2018-02-20)
+- Better handling of null return values
+- Iterate over `NSSet` instances
+
 ### v0.10.0 (2018-01-30)
 - Rewrote everything in JavaScript (no more c++ bindings)
 - This removes support for accessing objc constants (will be re-implemented in the future)
