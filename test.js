@@ -584,6 +584,21 @@ test('Iterate over a NSArray', t => {
 });
 
 
+test('Iterate over a NSDictionary', t => {
+  const {NSDictionary} = objc;
+
+  const inputDict = {a: 1, b: 2, c: 3};
+  const dictionary = NSDictionary.alloc().initWithObjects_forKeys_(['1', '2', '3'], ['a', 'b', 'c'])
+
+  for (let key of dictionary) {
+    key = String(key);
+    t.is(true, Object.prototype.hasOwnProperty.call(inputDict, key));
+    delete inputDict[key];
+  }
+
+  t.deepEqual({}, inputDict);
+});
+
 test('Iterate over non-enumerable', t => {
   const {NSObject} = objc;
 
