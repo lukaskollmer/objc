@@ -158,6 +158,17 @@ test('convert NSNumber to Number', t => {
   t.is(12, +number);
 });
 
+test('pass primitive w/out objc counterpart', t => {
+  const {NSMutableArray} = objc;
+  const array = NSMutableArray.array();
+  
+  try {
+    array.addObject_(() => {});
+  } catch (err) {
+    t.is(err.message, 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil');
+  }
+});
+
 
 /*
 Explicit type conversion
@@ -620,6 +631,12 @@ test('Iterate over non-enumerable', t => {
 /*
 Miscellaneous
 */
+
+test('construct invalid Instance', t => {
+  t.throws(() => {
+    const obj = new objc.Instance(null);
+  });
+});
 
 test('get username using NSProcessInfo, convert to javascript string and compare the value to the username given by `os.userInfo()`', t => {
   const NSProcessInfo = objc.NSProcessInfo;

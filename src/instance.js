@@ -8,10 +8,12 @@ const cls = {}; // Internally cached objc classes used for converting objects be
 
 class Instance {
   constructor(args) {
-    if (typeof args === 'string') {
+    if (args === undefined || args === null || !['string', 'object'].includes(typeof args)) {
+      throw new TypeError('Invalid arguments passed to the constructor');
+    } else if (typeof args === 'string') {
       this.type = 'class';
       this.ptr = runtime.objc_getClass(args);
-    } else if (typeof args === 'object') {
+    } else {
       // TODO check whether the object is a class or an instance. object_isClass or something like that
       this.type = 'instance';
       this.ptr = args;
@@ -190,9 +192,8 @@ class Instance {
         return cls.NSString.stringWithUTF8String_(object);
       } else if (hint === ':') {
         return new Selector(object);
-      } else if (hint === '#') {
-        return Instance.proxyForClass(object);
       }
+      return Instance.proxyForClass(object);
     }
 
     // Date -> NSDate
