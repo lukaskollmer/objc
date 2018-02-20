@@ -1,6 +1,7 @@
 const runtime = require('./runtime');
 const Instance = require('./instance');
 const Block = require('./block');
+const Selector = require('./selector');
 
 const {InstanceProxy, MethodProxy} = require('./proxies');
 
@@ -10,6 +11,7 @@ const builtins = {
   InstanceProxy,
   MethodProxy,
   Block,
+  Selector,
   import: runtime.import,
   js: Instance.js,
   ns: Instance.ns,

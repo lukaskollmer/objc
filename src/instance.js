@@ -45,6 +45,7 @@ class Instance {
 
     const method = this.methodForSelector(selector);
 
+    /* istanbul ignore if */
     if (typeof method === 'undefined' || method.isNull()) {
       throw new Error(`Unable to find method ${selector.name} on object ${this.description()}`);
     }
@@ -135,7 +136,7 @@ class Instance {
     ].forEach(name => { cls[name] = Instance.proxyForClass(name); }); // eslint-disable-line brace-style
   }
 
-  static js(object) {
+  static js(object, returnInputIfUnableToConvert = false) {
     Instance.loadClassesIfNecessary();
 
     if (object.isKindOfClass_(cls.NSString)) {
@@ -153,7 +154,7 @@ class Instance {
     if (object.isKindOfClass_(cls.NSArray)) {
       const newArray = [];
       for (const obj of object) {
-        newArray.push(Instance.js(obj));
+        newArray.push(Instance.js(obj, true));
       }
       return newArray;
     }
@@ -161,14 +162,14 @@ class Instance {
     if (object.isKindOfClass_(cls.NSDictionary)) {
       const newObject = {};
       for (const key of object) {
-        newObject[String(key)] = Instance.js(object.objectForKey_(key));
+        newObject[String(key)] = Instance.js(object.objectForKey_(key), true);
       }
 
       return newObject;
     }
 
     // Return null if there's no JS counterpart for the objc type
-    return null;
+    return returnInputIfUnableToConvert ? object : null;
   }
 
   // 'Convert' a JavaScript object to its objc counterpart

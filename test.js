@@ -146,10 +146,18 @@ test('Automatic array conversion (JS array -> NSArray)', t => {
   });
 });
 
+test('convert NSNumber to Number', t => {
+  const number = objc.ns(12);
+
+  t.is(12, +number);
+});
+
 
 /*
 Explicit type conversion
 */
+
+// String
 
 test('Type conversion JS -> ObjC: String', t => {
   const NSString = objc.NSString;
@@ -158,49 +166,6 @@ test('Type conversion JS -> ObjC: String', t => {
   const asNSString = objc.ns(input);
 
   t.true(asNSString.isKindOfClass_(NSString));
-});
-
-test('Type conversion JS -> ObjC: Number', t => {
-  const NSNumber = objc.NSNumber;
-
-  const input = 42;
-  const asNSNumber = objc.ns(input);
-
-  t.true(asNSNumber.isKindOfClass_(NSNumber));
-});
-
-test('Type conversion JS -> ObjC: Array', t => {
-  const NSArray = objc.NSArray;
-
-  const input = ['time', 'and', 'relative', 'dimensions', 'in', 'space'];
-  const asNSArray = objc.ns(input);
-
-  t.true(asNSArray.isKindOfClass_(NSArray));
-});
-
-test('Type conversion JS -> ObjC: Date', t => {
-  const NSDate = objc.NSDate;
-
-  const input = new Date('1963-11-23T17:16:20');
-  const asNSDate = objc.ns(input);
-
-  t.true(asNSDate.isKindOfClass_(NSDate));
-});
-
-test('Type conversion JS -> ObjC: Object', t => {
-  const input = {firstName: 'Lukas', lastName: 'Kollmer'};
-  const objcValue = objc.ns(input);
-
-  t.true(objcValue.objectForKey_('firstName').isEqualToString_('Lukas'))
-  t.true(objcValue.objectForKey_('lastName').isEqualToString_('Kollmer'))
-
-});
-
-test('Type conversion JS -> ObjC: Unknown', t => {
-  const input = () => {};
-  const objcValue = objc.ns(input);
-
-  t.is(objcValue, null);
 });
 
 test('Type conversion ObjC -> JS: String', t => {
@@ -212,6 +177,17 @@ test('Type conversion ObjC -> JS: String', t => {
   t.is(asString, 'trust me. i am the doctor');
 });
 
+// Number
+
+test('Type conversion JS -> ObjC: Number', t => {
+  const NSNumber = objc.NSNumber;
+
+  const input = 42;
+  const asNSNumber = objc.ns(input);
+
+  t.true(asNSNumber.isKindOfClass_(NSNumber));
+});
+
 test('Type conversion ObjC -> JS: Number', t => {
   const NSNumber = objc.NSNumber;
 
@@ -219,6 +195,17 @@ test('Type conversion ObjC -> JS: Number', t => {
   const asNumber = objc.js(input);
 
   t.is(asNumber, 42);
+});
+
+// Array
+
+test('Type conversion JS -> ObjC: Array', t => {
+  const NSArray = objc.NSArray;
+
+  const input = ['time', 'and', 'relative', 'dimensions', 'in', 'space'];
+  const asNSArray = objc.ns(input);
+
+  t.true(asNSArray.isKindOfClass_(NSArray));
 });
 
 test('Type conversion ObjC -> JS: Array', t => {
@@ -232,6 +219,17 @@ test('Type conversion ObjC -> JS: Array', t => {
   t.deepEqual(items, asArray);
 });
 
+// Date
+
+test('Type conversion JS -> ObjC: Date', t => {
+  const NSDate = objc.NSDate;
+
+  const input = new Date('1963-11-23T17:16:20');
+  const asNSDate = objc.ns(input);
+
+  t.true(asNSDate.isKindOfClass_(NSDate));
+});
+
 test('Type conversion ObjC -> JS: Date', t => {
   const NSDate = objc.NSDate;
 
@@ -239,6 +237,69 @@ test('Type conversion ObjC -> JS: Date', t => {
   const asDate = objc.js(input);
 
   t.true(asDate instanceof Date);
+});
+
+// Object
+
+test('Type conversion JS -> ObjC: Object', t => {
+  const input = {firstName: 'Lukas', lastName: 'Kollmer'};
+  const objcValue = objc.ns(input);
+
+  t.true(objcValue.objectForKey_('firstName').isEqualToString_('Lukas'))
+  t.true(objcValue.objectForKey_('lastName').isEqualToString_('Kollmer'))
+});
+
+test('Type conversion ObjC -> JS: Object', t => {
+  const {NSObject, NSString, NSMutableDictionary} = objc;
+
+  // 1: convert a dictionary that contains only objects we can convert to JS
+
+  const name = NSMutableDictionary.dictionary();
+  name.setObject_forKey_('Lukas', 'first');
+  name.setObject_forKey_('Kollmer', 'last');
+
+  const me = NSMutableDictionary.dictionary();
+  me.setObject_forKey_(name, 'name');
+  me.setObject_forKey_(19, 'age');
+
+  t.deepEqual(objc.js(me), {
+    age: 19,
+    name: {
+      first: 'Lukas',
+      last: 'Kollmer'
+    }
+  });
+
+  // 2: add some objects that don't have a JS representation
+  // We can't use `t.deepEqual` for this because that doesn't work with our proxies (ava seems to use lodash for that)
+
+  const obj = NSObject.new();
+  me.setObject_forKey_(obj, 'obj');
+
+  const me_js = objc.js(me);
+
+  t.is(19, me_js.age);
+  t.deepEqual({first: 'Lukas', last: 'Kollmer'}, me_js.name);
+  t.is(true, obj.isEqual_(me_js.obj));
+});
+
+// Selector
+
+test('Type conversion JS -> ObjC: Selector', t => {
+  const input = 'localizedDescriptionForRegion:completionHandler:';
+  const sel = objc.ns(input, ':');
+
+  t.is(true, sel instanceof objc.Selector)
+  t.is(input, sel.name);
+});
+
+// Unknown
+
+test('Type conversion JS -> ObjC: Unknown', t => {
+  const input = () => {};
+  const objcValue = objc.ns(input);
+
+  t.is(null, objcValue);
 });
 
 test('Type conversion ObjC -> JS: Unknown', t => {
@@ -249,6 +310,7 @@ test('Type conversion ObjC -> JS: Unknown', t => {
 
   t.is(null, jsValue);
 });
+
 
 
 /*
