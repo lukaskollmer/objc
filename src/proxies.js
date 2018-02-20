@@ -32,11 +32,11 @@ function InstanceProxy(object) {
         return () => `[objc.InstanceProxy ${self.description()}]`;
       } else if (key === Symbol.toPrimitive) {
         return hint => {
-          if (hint === 'string') {
-            return self.description();
-          } else if (hint === 'number') {
+          if (hint === 'number') {
             return MethodProxy(self, 'doubleValue')(); // eslint-disable-line new-cap
           }
+          // Hint is either 'string' or 'default'
+          return self.description();
         };
       } else if (key === Symbol.iterator) {
         const isKindOfClass = MethodProxy(self, 'isKindOfClass_'); // eslint-disable-line new-cap
