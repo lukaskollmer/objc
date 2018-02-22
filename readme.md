@@ -122,6 +122,9 @@ const sorted = array.sortedArrayUsingComparator_(block);
 In the future, I'd like to add support for:
 - inout parameters (`[obj doSomethingWithError:&error];`)
 - loading `NSString*` constants at runtime
+- method swizzling
+- creating custom objc classes
+- runtime introspection (accessing an object's properties, ivars, methods, etc)
 
 
 ## License
