@@ -1,3 +1,7 @@
+### v0.12.0 (2018-02-23)
+- Added support for loading `NSString*` constants
+- Cache imported frameworks to avoid loading the same framework multiple times
+
 ### v0.11.0 (2018-02-20)
 - Better handling of null return values
 - Iterate over `NSSet` instances
