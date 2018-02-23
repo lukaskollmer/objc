@@ -79,7 +79,7 @@ The `objc` module automatically catches all exceptions thrown by Objective-C met
 
 Example:
 ```js
-const {NSMutableArray} = require('objc');
+const {NSMutableArray} = objc;
 const array = NSMutableArray.array();
 
 array.addObject_(null);
@@ -105,7 +105,7 @@ When a block takes an Objective-C object as its parameter, you'll need to manual
 
 **Example:** Sort an array by word length, longest to shortest
 ```js
-const {NSArray, Block, wrap} = require('objc');
+const {NSArray, Block, wrap} = objc;
 const array = NSArray.arrayWithArray_(['I', 'Am', 'The', 'Doctor']);
 
 const block = new Block((obj1, obj2) => {
@@ -118,10 +118,19 @@ const sorted = array.sortedArrayUsingComparator_(block);
 // => ['Doctor', 'The', 'Am', 'I']
 ```
 
+### Constants
+You can load `NSString*` constants just like you'd access a class:
+
+```js
+const {NSFontAttributeName} = objc;
+console.log(NSFontAttributeName);   // => 'NSFont'
+```
+
+`NSString*` constants are returned as native JavaScript `String` objects.
+
 ## Roadmap
 In the future, I'd like to add support for:
 - inout parameters (`[obj doSomethingWithError:&error];`)
-- loading `NSString*` constants at runtime
 - method swizzling
 - creating custom objc classes
 - runtime introspection (accessing an object's properties, ivars, methods, etc)
