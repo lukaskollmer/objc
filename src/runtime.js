@@ -27,9 +27,15 @@ const libobjc = new ffi.Library('libobjc', {
 
 libobjc.objc_msgSend = ffi.DynamicLibrary().get('objc_msgSend'); // eslint-disable-line new-cap
 
+const importList = [];
+
 const importFramework = name => {
-  const handle = lib.dlopen(`/System/Library/Frameworks/${name}.framework/${name}`, 1); // 1: RTLD_LAZY
-  return !handle.isNull();
+  if (importList.includes(name)) return true; // eslint-disable-line curly
+
+  const handle = lib.dlopen(`/System/Library/Frameworks/${name}.framework/${name}`, ffi.DynamicLibrary.FLAGS.RTLD_LAZY);
+  const success = !handle.isNull();
+  if (success) importList.push(name); // eslint-disable-line curly
+  return success;
 };
 
 importFramework('Foundation');
