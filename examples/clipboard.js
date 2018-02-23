@@ -11,11 +11,9 @@ const {
   NSPasteboardTypeString
 } = objc;
 
-const types = NSMutableArray.array();
-types.addObject_(NSPasteboardTypeString);
 
 let pasteboard = NSPasteboard.generalPasteboard();
-pasteboard.declareTypes_owner_(types, null);
+pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
 
 const get = () => {
   return pasteboard.stringForType_(NSPasteboardTypeString);

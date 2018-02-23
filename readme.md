@@ -66,7 +66,7 @@ objc.import('AppKit');
 const {NSPasteboard, NSPasteboardTypeString} = objc;
 
 let pasteboard = NSPasteboard.generalPasteboard();
-pasteboard.declareTypes_owner_(objc.ns([NSPasteboardTypeString]), null);
+pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
 
 pasteboard.setString_forType_("44 > 45", NSPasteboardTypeString);
 ```
