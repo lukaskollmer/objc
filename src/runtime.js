@@ -34,6 +34,7 @@ const importFramework = name => {
 
   const handle = lib.dlopen(`/System/Library/Frameworks/${name}.framework/${name}`, ffi.DynamicLibrary.FLAGS.RTLD_LAZY);
   const success = !handle.isNull();
+  /* istanbul ignore else */
   if (success) importList.push(name); // eslint-disable-line curly
   return success;
 };
