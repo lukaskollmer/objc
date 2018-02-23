@@ -40,7 +40,7 @@ class Block {
 
     const block = new __block_literal();
 
-    block.isa = runtime.getConstant('_NSConcreteGlobalBlock');
+    block.isa = runtime.getSymbol('_NSConcreteGlobalBlock');
     block.flags = 1 << 29;
     block.reserved = 0;
     block.invoke = callback;

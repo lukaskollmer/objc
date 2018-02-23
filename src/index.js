@@ -28,6 +28,10 @@ module.exports = new Proxy({}, {
       return builtins.wrap(key);
     }
 
-    throw new Error(`Unable to find class '${key}'`);
+    // Not a class, see if we can find a constant with that name
+    const symbol = runtime.getSymbolAsId(key);
+    if (symbol !== null) return builtins.wrap(symbol).UTF8String(); // eslint-disable-line curly, new-cap
+
+    throw new Error(`Unable to find symbol '${key}'`);
   }
 });

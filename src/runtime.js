@@ -1,6 +1,7 @@
 /* eslint-disable camelcase, key-spacing */
 
 const ffi = require('ffi');
+const ref = require('ref');
 
 const lib = new ffi.Library(null, {
   dlopen: ['pointer', ['string', 'int']]
@@ -33,7 +34,19 @@ const importFramework = name => {
 
 importFramework('Foundation');
 
-const getConstant = name => new ffi.DynamicLibrary().get(name);
+const getSymbol = name => new ffi.DynamicLibrary().get(name);
+
+// NSString* constants require special handling
+// We have to adjust the symbol's type, in order to dereference it
+const getSymbolAsId = name => {
+  try {
+    const symbol = getSymbol(name);
+    symbol.type = ref.refType(ref.refType(ref.types.void));
+    return symbol.deref();
+  } catch (err) {
+    return null;
+  }
+};
 
 const msgSend = (returnType, argumentTypes) => {
   return ffi.ForeignFunction(libobjc.objc_msgSend, returnType, argumentTypes); // eslint-disable-line new-cap
@@ -47,4 +60,5 @@ module.exports = libobjc;
 module.exports.msgSend = msgSend;
 module.exports.import = importFramework;
 module.exports.classExists = classExists;
-module.exports.getConstant = getConstant;
+module.exports.getSymbol = getSymbol;
+module.exports.getSymbolAsId = getSymbolAsId;
