@@ -334,33 +334,13 @@ test('Type conversion ObjC -> JS: Unknown', t => {
 Constants (not yet supported)
 */
 
-test.skip('load constant directly from `objc` module', t => {
+test('load constant directly from `objc` module', t => {
   objc.import('AppKit');
-  const NSFontAttributeName = objc.NSFontAttributeName;
+  const {NSFontAttributeName} = objc;
 
   t.is(NSFontAttributeName, 'NSFont');
 });
 
-test.skip('load constant w/out bundle', t => {
-  objc.import('AppKit');
-  const NSFontAttributeName = objc.constant('NSFontAttributeName');
-
-  t.is(NSFontAttributeName, 'NSFont');
-});
-
-test.skip('load constant w/ bundle', t => {
-  objc.import('AppKit');
-  const NSFontAttributeName = objc.constant('NSFontAttributeName', 'AppKit');
-
-  t.is(NSFontAttributeName, 'NSFont');
-});
-
-test.skip('load constant w/ full bundle name', t => {
-  objc.import('AppKit');
-  const NSFontAttributeName = objc.constant('NSFontAttributeName', 'com.apple.AppKit');
-
-  t.is(NSFontAttributeName, 'NSFont');
-});
 
 
 /*
