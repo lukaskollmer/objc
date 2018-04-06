@@ -140,10 +140,10 @@ console.log(NSFontAttributeName);   // => 'NSFont'
 
 
 ### Method swizzling
-Method swizzling allows you to replace a method's implementation.
+Method swizzling allows you to replace a method's implementation:
 ```js
 const {NSProcessInfo} = objc;
-objc.swizzle('NSProcessInfo', 'processorCount', (self, _cmd) => {
+objc.swizzle(NSProcessInfo, 'processorCount', (self, _cmd) => {
   return 12;
 });
 
