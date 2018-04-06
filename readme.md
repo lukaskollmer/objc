@@ -168,6 +168,7 @@ a.isEqualToDate_(b); // => true
 **Note**
 - Just like with blocks, you have to `wrap` all non-primitive parameters
 - If you want to swizzle a class method, pass `'class'` as the `swizzle` function's last parameter
+- `objc.swizzle` returns a function that - if called - restores the original implementation of the swizzled method
 
 ## Roadmap
 In the future, I'd like to add support for:
