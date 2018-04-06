@@ -138,10 +138,32 @@ console.log(NSFontAttributeName);   // => 'NSFont'
 
 `NSString*` constants are returned as native JavaScript `String` objects.
 
+
+### Method swizzling
+Method swizzling allows you to replace a method's implementation.
+```js
+const {NSProcessInfo} = objc;
+objc.swizzle('NSProcessInfo', 'processorCount', (self, _cmd) => {
+  return 12;
+});
+
+NSProcessInfo.processInfo().processorCount(); // => 12
+```
+
+```js
+const {NSDate, wrap} = objc;
+objc.swizzle(NSDate, 'dateByAddingTimeInterval:', (self, _cmd, timeInterval) => {
+  self = wrap(self);
+  return self.xxx__dateByAddingTimeInterval_(timeInterval * 2);
+});
+```
+**Note**
+- Just like with blocks, you have to `wrap` all non-primitive parameters
+- If you want to swizzle a class method, pass `'class'` as the `swizzle` function's last parameter
+
 ## Roadmap
 In the future, I'd like to add support for:
 - inout parameters (`[obj doSomethingWithError:&error];`)
-- method swizzling
 - creating custom objc classes
 - runtime introspection (accessing an object's properties, ivars, methods, etc)
 

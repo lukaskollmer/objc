@@ -1,3 +1,6 @@
+### v0.13.0 (2018-04-06)
+- Added a `objc.swizzle` function
+
 ### v0.12.0 (2018-02-23)
 - Added support for loading `NSString*` constants
 - Cache imported frameworks to avoid loading the same framework multiple times
