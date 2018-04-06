@@ -34,12 +34,23 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 #### objc.import(bundleName)
 Load a framework
 
-#### objc.ns(someObject)
-Convert a JavaScript object to its objc equivalent
+#### objc.ns(object, [hint = '@'])
+Convert a JavaScript object to its objc equivalent. Returns `null` if the object doesn't have an ObjC counterpart  
+Takes an optional second parameter to specify whether strings should be converted to `NSString` objects (default), `SEL` or `Class`
 
-#### objc.js(someObject)
+#### objc.js(object, [returnInputIfUnableToConvert = false])
 Convert an objc object to its JavaScript equivalent
-_(More info about this in the type coversion section)_
+Takes an optional second parameter indicating whether it should return `null` or the input if the object doesn't have a JS counterpart
+
+**Type Conversion**
+
+| JavaScript | Objective-C  |
+| :--------- | :----------- |
+| String     | NSString     |
+| Date       | NSDate       |
+| Number     | NSNumber     |
+| Array      | NSArray      |
+| Object     | NSDictionary |
 
 
 ### Calling methods

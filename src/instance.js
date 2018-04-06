@@ -93,8 +93,12 @@ class Instance {
     try {
       retval = msgSend(this.ptr, selector.ptr, ...args);
     } catch (err) {
-      const exc = new InstanceProxy(new Instance(err));
+      /* istanbul ignore if */
+      if (err instanceof Error) {
+        throw err;
+      }
 
+      const exc = new InstanceProxy(new Instance(err));
       throw new Error(`${exc.name()} ${exc.reason()}`);
     }
 

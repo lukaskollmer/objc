@@ -629,6 +629,87 @@ test('Iterate over non-enumerable', t => {
 
 
 /*
+Method swizzling
+*/
+
+test('[method swizzling] swizzle class method', t => {
+  const {NSDate} = objc;
+
+  objc.swizzle(NSDate, 'date', () => {
+    return NSDate.distantPast();
+  }, 'class');
+
+  t.true(NSDate.date().isEqualToDate_(NSDate.distantPast()));
+});
+
+test('[method swizzling] swizzle instance method (primitive return type)', t => {
+  const {NSProcessInfo} = objc;
+
+  objc.swizzle(NSProcessInfo, 'processorCount', () => {
+    return 12;
+  });
+
+  t.is(12, NSProcessInfo.processInfo().processorCount());
+});
+
+test('[method swizzling] swizzle instance method (object return type)', t => {
+  const {NSObject} = objc;
+
+  objc.swizzle(NSObject, 'description', () => {
+    return objc.ns('hello there');
+  });
+
+  t.true(NSObject.new().description().isEqualToString_('hello there'));
+});
+
+test('[method swizzling] swizzle instance method with parameters', t => {
+  const {NSDate, wrap} = objc;
+
+  objc.swizzle(NSDate, 'dateByAddingTimeInterval:', (self, _cmd, timeInterval) => {
+    self = wrap(self);
+    return self.xxx__dateByAddingTimeInterval_(timeInterval * 2);
+  });
+
+  const x = NSDate.alloc().initWithTimeIntervalSince1970_(0);
+  const y = x.dateByAddingTimeInterval(2);
+  const z = NSDate.alloc().initWithTimeIntervalSince1970_(4);
+  t.true(y.isEqualToDate_(z));
+});
+
+test('[method swizzling] instance method: original implementation is still available', t => {
+  // NSString is a class cluster, which is why we swizzle -[__NSCFString length] instead of `-[NSString length]`
+  objc.swizzle('__NSCFString', 'length', () => {
+    return 42;
+  });
+
+  const string = objc.ns('hello world');
+  t.is(42, string.length());
+  t.is(11, string.xxx__length());
+});
+
+test('[method swizzling] class method: original implementation is still available', t => {
+  const {NSProcessInfo, NSDate} = objc;
+
+  const restore = objc.swizzle(NSProcessInfo, 'processInfo', () => {
+    return NSDate.date();
+  }, 'class');
+
+  t.true(NSProcessInfo.processInfo().isKindOfClass_(NSDate));
+  t.true(NSProcessInfo.processInfo().isEqualToDate_(NSDate.date()));
+  t.true(NSProcessInfo.xxx__processInfo().isKindOfClass_(NSProcessInfo));
+
+  restore(); // Restore the original implementation bc we need it below
+});
+
+test('[method swizzling] invalid parameters: method type', t => {
+  t.throws(() => {
+    objc.swizzle('NSString', 'length', () => {}, 'foo');
+  })
+})
+
+
+
+/*
 Miscellaneous
 */
 

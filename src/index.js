@@ -2,6 +2,7 @@ const runtime = require('./runtime');
 const Instance = require('./instance');
 const Block = require('./block');
 const Selector = require('./selector');
+const swizzle = require('./swizzle');
 
 const {InstanceProxy, MethodProxy} = require('./proxies');
 
@@ -12,6 +13,7 @@ const builtins = {
   MethodProxy,
   Block,
   Selector,
+  swizzle,
   import: runtime.import,
   js: Instance.js,
   ns: Instance.ns,

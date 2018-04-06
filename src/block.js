@@ -18,6 +18,10 @@ const __block_descriptor = struct({
   Block_size: 'ulonglong' // eslint-disable-line camelcase
 });
 
+const descriptor = new __block_descriptor();
+descriptor.reserved = 0;
+descriptor.Block_size = __block_literal.size; // eslint-disable-line camelcase
+
 class Block {
   constructor(fn, returnType, argumentTypes) {
     if (typeof fn !== 'function' || typeof returnType !== 'string' || argumentTypes === undefined) {
@@ -34,8 +38,14 @@ class Block {
   makeBlock() {
     const self = this;
     const callback = ffi.Callback(this.returnType, this.argumentTypes, function () { // eslint-disable-line new-cap
-      // call the block implementation, skipping the 1st parameter (the block itself)
-      return self.fn.apply(null, Array.from(arguments).slice(1));
+      // Call the block implementation, skipping the 1st parameter (the block itself)
+      const retval = self.fn.apply(null, Array.from(arguments).slice(1));
+
+      // Return the return value, unwrapping potential instance proxies
+      if (retval !== null && retval.___is_instance_proxy === true) {
+        return retval.ptr;
+      }
+      return retval;
     });
 
     const block = new __block_literal();
@@ -44,7 +54,7 @@ class Block {
     block.flags = 1 << 29;
     block.reserved = 0;
     block.invoke = callback;
-    block.descriptor = null; // TODO can we get away w/out setting the descriptor?
+    block.descriptor = descriptor.ref();
 
     return block.ref();
   }

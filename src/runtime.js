@@ -1,4 +1,4 @@
-/* eslint-disable camelcase, key-spacing */
+/* eslint-disable camelcase, key-spacing, no-multi-spaces, array-bracket-spacing */
 
 const ffi = require('ffi');
 const ref = require('ref');
@@ -9,20 +9,30 @@ const lib = new ffi.Library(null, {
 
 const libobjc = new ffi.Library('libobjc', {
   // Selectors
-  sel_getUid : ['pointer', ['string']],
-  sel_getName: ['string', ['pointer']],
+  sel_getUid : ['pointer', ['string' ]],
+  sel_getName: ['string',  ['pointer']],
 
   // Classes
-  objc_getClass          : ['pointer', ['string']],
+  objc_getClass          : ['pointer', ['string' ]],
   object_getClass        : ['pointer', ['pointer']],
-  class_getName          : ['string', ['pointer']],
+  object_isClass         : ['bool',    ['pointer']],
+  class_getName          : ['string',  ['pointer']],
   class_getClassMethod   : ['pointer', ['pointer', 'pointer']],
   class_getInstanceMethod: ['pointer', ['pointer', 'pointer']],
+  class_addMethod        : ['bool',    ['pointer', 'pointer', 'pointer', 'string']],
+  class_replaceMethod    : ['pointer', ['pointer', 'pointer', 'pointer', 'string']],
 
   // Methods
-  method_copyReturnType      : ['string', ['pointer']],
-  method_copyArgumentType    : ['string', ['pointer', 'int']],
-  method_getNumberOfArguments: ['int', ['pointer']]
+  method_getImplementation      : ['pointer', ['pointer']],
+  method_getTypeEncoding        : ['string',  ['pointer']],
+  method_copyReturnType         : ['string',  ['pointer']],
+  method_copyArgumentType       : ['string',  ['pointer', 'int']],
+  method_getNumberOfArguments   : ['int',     ['pointer']],
+  method_exchangeImplementations: ['void',    ['pointer', 'pointer']],
+  method_setImplementation      : ['pointer', ['pointer', 'pointer']],
+
+  // IMP
+  imp_implementationWithBlock: ['pointer', ['pointer']]
 });
 
 libobjc.objc_msgSend = ffi.DynamicLibrary().get('objc_msgSend'); // eslint-disable-line new-cap

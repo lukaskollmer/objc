@@ -66,6 +66,8 @@ function InstanceProxy(object) {
 
       if (key === 'ptr') {
         return self.ptr;
+      } else if (key === '___is_instance_proxy') {
+        return true;
       }
 
       return MethodProxy(self, key); // eslint-disable-line new-cap
