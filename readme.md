@@ -150,12 +150,20 @@ objc.swizzle(NSProcessInfo, 'processorCount', (self, _cmd) => {
 NSProcessInfo.processInfo().processorCount(); // => 12
 ```
 
+The method's original implementation is still available, with the `xxx__` prefix:
+
 ```js
 const {NSDate, wrap} = objc;
 objc.swizzle(NSDate, 'dateByAddingTimeInterval:', (self, _cmd, timeInterval) => {
   self = wrap(self);
   return self.xxx__dateByAddingTimeInterval_(timeInterval * 2);
 });
+
+const now = NSDate.date();
+const a = now.dateByAddingTimeInterval_(2);
+const b = now.xxx__dateByAddingTimeInterval_(4);
+
+a.isEqualToDate_(b); // => true
 ```
 **Note**
 - Just like with blocks, you have to `wrap` all non-primitive parameters
