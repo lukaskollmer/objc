@@ -14,8 +14,8 @@
     "node": ">=7 <9"
   },
   "scripts": {
-    "test_": "ava --verbose",
-    "test": "xo && nyc ava --verbose"
+    "test_": "ava --verbose --serial",
+    "test": "xo && nyc ava --verbose --serial"
   },
   "keywords": [
     "objc",
