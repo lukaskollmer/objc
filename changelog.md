@@ -1,3 +1,7 @@
+### v0.14.0 (2018-04-15)
+- Implemented inout parameters
+- Dropped support for node 7.x
+
 ### v0.13.0 (2018-04-06)
 - Added a `objc.swizzle` function
 
