@@ -1,4 +1,5 @@
 const runtime = require('./runtime');
+const ref = require('ref');
 const Selector = require('./selector');
 const types = require('./types');
 const {InstanceProxy} = require('./proxies');
@@ -31,7 +32,7 @@ class Instance {
     return runtime.class_getInstanceMethod(runtime.object_getClass(this.ptr), selector.ptr);
   }
 
-  call(selector, ...args) {
+  call(selector, ...argv) {
     if (typeof selector === 'string') {
       selector = new Selector(selector);
     }
@@ -61,7 +62,9 @@ class Instance {
 
     const returnType = runtime.method_copyReturnType(method);
 
-    args = args.map((arg, idx) => {
+    const inoutArgs = []; // indices of inout args (ie `NSError **`)
+
+    const args = argv.map((arg, idx) => {
       idx += 2;
 
       if (arg instanceof Block) {
@@ -72,12 +75,16 @@ class Instance {
         return arg;
       }
 
+      const expectedArgumentType = runtime.method_copyArgumentType(method, idx);
+
       if (arg !== null && typeof arg === 'object' && typeof arg.ptr !== 'undefined') {
+        if (expectedArgumentType === '^@') {
+          inoutArgs.push(idx);
+        }
         return arg.ptr;
       }
 
       // If the method expects id, SEL or Class, we convert arg to the expected type and return the pointer
-      const expectedArgumentType = runtime.method_copyArgumentType(method, idx);
       if (['@', ':', '#'].includes(expectedArgumentType)) {
         const _obj = Instance.ns(arg, expectedArgumentType);
         return _obj === null ? null : _obj.ptr;
@@ -102,6 +109,11 @@ class Instance {
       throw new Error(`${exc.name()} ${exc.reason()}`);
     }
 
+    inoutArgs.forEach(idx => {
+      idx -= 2; // skip `self` and `_cmd`
+      argv[idx].ptr = argv[idx].ptr.deref();
+    });
+
     if (retval instanceof Buffer && retval.isNull()) {
       return null;
     }
@@ -115,12 +127,22 @@ class Instance {
   }
 
   description() {
+    if (this.ptr == null || this.ptr.isNull()) return '(null)';
     return this.call('debugDescription').UTF8String(); // eslint-disable-line new-cap
   }
 
   class() {
     return runtime.class_getName(this.type === 'class' ? this.ptr : this.call('class'));
   }
+
+
+  static alloc() {
+    var id = ref.types.void;
+    var idPtr = ref.refType(id);
+    var idPtrPtr = ref.refType(idPtr);
+    return new InstanceProxy(new Instance(ref.alloc(idPtrPtr)));
+  }
+
 
   static proxyForClass(classname) {
     return new InstanceProxy(new Instance(classname));

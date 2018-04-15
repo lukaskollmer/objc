@@ -17,7 +17,8 @@ const builtins = {
   import: runtime.import,
   js: Instance.js,
   ns: Instance.ns,
-  wrap: obj => new InstanceProxy(new Instance(obj))
+  wrap: obj => new InstanceProxy(new Instance(obj)),
+  allocRef: () => Instance.alloc()
 };
 
 module.exports = new Proxy({}, {

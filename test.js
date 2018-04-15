@@ -1,6 +1,9 @@
 import test from 'ava';
 
 const objc = require('./src/index');
+const util = require('util');
+
+const NULL_DESC = '[objc.InstanceProxy (null)]';
 
 // TODO
 // - test automatic conversion to String/Number using the constructor `Number(nsnumber_object)`
@@ -72,7 +75,6 @@ Object inspection
 */
 
 test('description of class proxy', t => {
-  const util = require('util');
   const NSDate = objc.NSDate;
 
   const description = util.inspect(NSDate);
@@ -81,7 +83,6 @@ test('description of class proxy', t => {
 });
 
 test('description of instance proxy', t => {
-  const util = require('util');
   const string = objc.NSString.stringWithString_('the north remembers');
 
   const description = util.inspect(string);
@@ -90,19 +91,26 @@ test('description of instance proxy', t => {
 });
 
 test('description of class method proxy', t => {
-  const util = require('util');
   const method = objc.NSDate.date;
 
   t.is(util.inspect(method), `[objc.MethodProxy '+[NSDate date]']`);
 });
 
 test('description of instance method proxy', t => {
-  const util = require('util');
   const obj = objc.NSObject.new()
 
   const method = obj.description;
 
   t.is(util.inspect(method), `[objc.MethodProxy '-[NSObject description]']`);
+});
+
+test('description of null proxy', t => {
+  const obj = objc.allocRef();
+  obj.ptr = obj.ptr.deref();
+
+  const description = util.inspect(obj);
+
+  t.is(description, NULL_DESC);
 });
 
 
@@ -352,41 +360,50 @@ test('load non-existent constant', t => {
 
 
 /*
-Inout parameters (not yet supported)
+Inout parameters
 */
 
-test.skip('inout parameters 1 (^@)', t => {
-  const NSFileManager = objc.NSFileManager;
+test('inout parameters 1 (^@)', t => {
+  const {NSFileManager, NSError} = objc;
   const fm = NSFileManager.defaultManager();
 
-  const filepath = '/Library/Caches/randomfilenamethatsurelydoesntexust.hey';
+  const filepath = '/Library/Caches/randomfilenamethatsurelydoesntexist.hey';
   fm.createFileAtPath_contents_attributes_(filepath, null, null);
 
-  const error1 = objc.ref(null);
+  const error1 = objc.allocRef();
   const success1 = fm.removeItemAtPath_error_(filepath, error1);
 
   t.is(success1, true);
-  t.is(typeof objc.deref(error1), 'undefined');
+  t.is(util.inspect(error1), NULL_DESC);
 
-  const error2 = objc.ref(null);
+  const error2 = objc.allocRef();
   const success2 = fm.removeItemAtPath_error_(filepath, error2);
 
   t.is(success2, false);
-  t.is(typeof objc.deref(error2), 'object');
+  t.true(error2.isKindOfClass_(NSError));
+  t.is(error2.code(), 4); // NSFileNoSuchFileError
 });
 
-test.skip('inout parameters 2 (^@)', t => {
-  const NSDictionary = objc.NSDictionary;
-  const NSAppleScript = objc.NSAppleScript;
-  const source = 'telll application "Safari" to get URL of current tab of window 1';
+test('inout parameters 2 (^@)', t => {
+  const {NSDictionary, NSAppleScript} = objc;
 
-  const script = NSAppleScript.alloc().initWithSource_(source);
+  const script = NSAppleScript.alloc().initWithSource_('telll application "Safari" to get URL of current tab of window 1');
 
-  const error = objc.ref(null);
+  const error = objc.allocRef();
   const success = script.compileAndReturnError_(error);
 
   t.is(success, false);
-  t.is(objc.deref(error).isKindOfClass_(NSDictionary), true);
+  t.true(error.isKindOfClass_(NSDictionary));
+});
+
+test('[inout parameters] `null` if not changed', t => {
+  const {NSAppleScript} = objc;
+
+  const script = NSAppleScript.alloc().initWithSource_(`tell application "System Events" to get name of current user`);
+  const error = objc.allocRef();
+  script.executeAndReturnError_(error);
+
+  t.is(util.inspect(error), NULL_DESC);
 });
 
 
