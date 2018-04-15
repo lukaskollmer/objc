@@ -1,10 +1,11 @@
-const runtime = require('./runtime');
 const ref = require('ref');
+const runtime = require('./runtime');
 const Selector = require('./selector');
 const types = require('./types');
 const {InstanceProxy} = require('./proxies');
 const Block = require('./block');
 
+const inoutType = ref.refType(ref.refType(ref.types.void));
 const cls = {}; // Internally cached objc classes used for converting objects between js and objc land
 
 class Instance {
@@ -62,7 +63,7 @@ class Instance {
 
     const returnType = runtime.method_copyReturnType(method);
 
-    const inoutArgs = []; // indices of inout args (ie `NSError **`)
+    const inoutArgs = []; // Indices of inout args (ie `NSError **`)
 
     const args = argv.map((arg, idx) => {
       idx += 2;
@@ -110,7 +111,7 @@ class Instance {
     }
 
     inoutArgs.forEach(idx => {
-      idx -= 2; // skip `self` and `_cmd`
+      idx -= 2; // Skip `self` and `_cmd`
       argv[idx].ptr = argv[idx].ptr.deref();
     });
 
@@ -127,7 +128,9 @@ class Instance {
   }
 
   description() {
-    if (this.ptr == null || this.ptr.isNull()) return '(null)';
+    if (this.ptr === null || this.ptr.isNull()) {
+      return '(null)';
+    }
     return this.call('debugDescription').UTF8String(); // eslint-disable-line new-cap
   }
 
@@ -135,14 +138,9 @@ class Instance {
     return runtime.class_getName(this.type === 'class' ? this.ptr : this.call('class'));
   }
 
-
   static alloc() {
-    var id = ref.types.void;
-    var idPtr = ref.refType(id);
-    var idPtrPtr = ref.refType(idPtr);
-    return new InstanceProxy(new Instance(ref.alloc(idPtrPtr)));
+    return new InstanceProxy(new Instance(ref.alloc(inoutType)));
   }
-
 
   static proxyForClass(classname) {
     return new InstanceProxy(new Instance(classname));
