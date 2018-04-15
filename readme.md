@@ -170,9 +170,31 @@ a.isEqualToDate_(b); // => true
 - If you want to swizzle a class method, pass `'class'` as the `swizzle` function's last parameter
 - `objc.swizzle` returns a function that - if called - restores the original implementation of the swizzled method
 
+### Inout parameters
+If a method expects an inout parameter (like `NSError**`), you can use the `objc.allocRef` function to get a pointer to a `nil` objc object that can be passed to a method expecting an `id*`:
+```js
+const {NSAppleScript} = objc;
+
+const script = NSAppleScript.alloc().initWithSource_('foobar');
+
+const error = objc.allocRef();
+script.executeAndReturnError_(error); // `executeAndReturnError:` takes a `NSDictionary**`
+
+console.log(error); // `error` is now a `NSDictionary*`
+```
+Output:
+```
+[objc.InstanceProxy {
+    NSAppleScriptErrorBriefMessage = "The variable foobar is not defined.";
+    NSAppleScriptErrorMessage = "The variable foobar is not defined.";
+    NSAppleScriptErrorNumber = "-2753";
+    NSAppleScriptErrorRange = "NSRange: {0, 6}";
+}]
+```
+If you need more advanced inout functionality (using primitive types, etc), simply use the [`ref`](https://github.com/TooTallNate/ref) module.
+
 ## Roadmap
 In the future, I'd like to add support for:
-- inout parameters (`[obj doSomethingWithError:&error];`)
 - creating custom objc classes
 - runtime introspection (accessing an object's properties, ivars, methods, etc)
 
