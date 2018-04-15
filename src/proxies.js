@@ -73,10 +73,12 @@ function InstanceProxy(object) {
       return MethodProxy(self, key); // eslint-disable-line new-cap
     },
     set: (_, key, value) => {
+      /* istanbul ignore next */
       if (key === 'ptr') {
         self.ptr = value;
         return true;
       }
+      /* istanbul ignore next */
       return false;
     }
   });
