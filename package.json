@@ -11,7 +11,7 @@
   },
   "main": "./src/index.js",
   "engines": {
-    "node": ">=7 <9"
+    "node": ">=8 <9"
   },
   "scripts": {
     "test_": "ava --verbose --serial",
