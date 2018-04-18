@@ -35,8 +35,7 @@ const getPossibleSelectorNames = selector => {
   for (let i = 0; i < numberOfPermutations; i++) {
     permutations.push([]);
     for (let j = 0; j < n; j++) {
-      const bitIsSet = (i & (1 << j)) !== 0;
-      permutations[i][j] = bitIsSet ? '_' : ':';
+      permutations[i][j] = i & (1 << j) ? '_' : ':';
     }
   }
 

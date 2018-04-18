@@ -339,7 +339,7 @@ test('Type conversion ObjC -> JS: Unknown', t => {
 
 
 /*
-Constants (not yet supported)
+Constants
 */
 
 test('load constant', t => {
@@ -716,7 +716,7 @@ test('[method swizzling] instance method: original implementation is still avail
   restore();
 });
 
-test('CURR [method swizzling] class method: original implementation is still available', t => {
+test('[method swizzling] class method: original implementation is still available', t => {
   const {NSProcessInfo, NSDate} = objc;
 
   const now = NSDate.date();
