@@ -310,6 +310,16 @@ test('Type conversion ObjC -> JS: Object', t => {
 
 // Selector
 
+test('[selector] create from string', t => {
+  const sel = new objc.Selector('allocWithCount:')
+  t.is(sel.name, 'allocWithCount:');
+});
+
+test('[selector] create from pointer', t => {
+  const sel = new objc.Selector(objc.runtime.sel_getUid('newWithValue:'));
+  t.is(sel.name, 'newWithValue:');
+})
+
 test('Type conversion JS -> ObjC: Selector', t => {
   const input = 'localizedDescriptionForRegion:completionHandler:';
   const sel = objc.ns(input, ':');
