@@ -21,6 +21,8 @@ const libobjc = new ffi.Library('libobjc', {
   class_getInstanceMethod: ['pointer', ['pointer', 'pointer']],
   class_addMethod        : ['bool',    ['pointer', 'pointer', 'pointer', 'string']],
   class_replaceMethod    : ['pointer', ['pointer', 'pointer', 'pointer', 'string']],
+  objc_allocateClassPair : ['pointer', ['pointer', 'string', 'int']],
+  objc_registerClassPair : ['void',    ['pointer']],
 
   // Methods
   method_getImplementation      : ['pointer', ['pointer']],

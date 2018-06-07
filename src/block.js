@@ -23,23 +23,44 @@ descriptor.reserved = 0;
 descriptor.Block_size = __block_literal.size; // eslint-disable-line camelcase
 
 class Block {
-  constructor(fn, returnType, argumentTypes) {
+  constructor(fn, returnType, argumentTypes, skipBlockArgument = true) {
     if (typeof fn !== 'function' || typeof returnType !== 'string' || argumentTypes === undefined) {
       throw new TypeError('Invalid arguments passed to Block constructor');
     }
 
     this.fn = fn;
-    this.returnType = types[returnType];
+    this.returnType = types[returnType.charAt(0)];
     this.argumentTypes = argumentTypes;
-    this.argumentTypes.splice(0, 0, '@'); // 1st argument is the block itself
-    this.argumentTypes = this.argumentTypes.map(type => types[type]);
+
+    this.skipBlockArgument = skipBlockArgument;
+
+    if (skipBlockArgument) {
+      this.argumentTypes.splice(0, 0, '@'); // 1st argument is the block itself
+    }
+    this.argumentTypes = this.argumentTypes.map(type => types[type.charAt(0)]);
   }
 
   makeBlock() {
+    const block = new __block_literal();
+
+    block.isa = runtime.getSymbol('_NSConcreteGlobalBlock');
+    block.flags = 1 << 29;
+    block.reserved = 0;
+    block.invoke = this.getFunctionPointer();
+    block.descriptor = descriptor.ref();
+
+    return block.ref();
+  }
+
+  getFunctionPointer() {
     const self = this;
     const callback = ffi.Callback(this.returnType, this.argumentTypes, function () { // eslint-disable-line new-cap
       // Call the block implementation, skipping the 1st parameter (the block itself)
-      const retval = self.fn.apply(null, Array.from(arguments).slice(1));
+      const retval = self.fn.apply(null, Array.from(arguments).slice(self.skipBlockArgument ? 1 : 0));
+
+      if (retval === undefined) {
+        return null;
+      }
 
       // Return the return value, unwrapping potential instance proxies
       if (retval !== null && retval.___is_instance_proxy === true) {
@@ -48,15 +69,7 @@ class Block {
       return retval;
     });
 
-    const block = new __block_literal();
-
-    block.isa = runtime.getSymbol('_NSConcreteGlobalBlock');
-    block.flags = 1 << 29;
-    block.reserved = 0;
-    block.invoke = callback;
-    block.descriptor = descriptor.ref();
-
-    return block.ref();
+    return callback;
   }
 }
 
