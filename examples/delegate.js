@@ -10,6 +10,7 @@ const {
 
 const FileManagerDelegate = objc.createClass('FileManagerDelegate', 'NSObject', {
   'fileManager:shouldMoveItemAtPath:toPath:': (self, cmd, fileManager, srcPath, dstPath) => {
+    console.log('-[NSFileManagerDelegate fileManager:shouldMoveItemAtPath:toPath:]');
     return 1;
   },
 
