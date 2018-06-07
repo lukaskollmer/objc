@@ -1,3 +1,7 @@
+### v0.15.0 (2018-06-07)
+- Added `objc.createClass`
+- The `objc.Selector` constructor can now also be called w/ a `SEL` pointer
+
 ### v0.14.0 (2018-04-15)
 - Implemented inout parameters
 - Dropped support for node 7.x

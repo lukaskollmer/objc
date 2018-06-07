@@ -193,9 +193,28 @@ Output:
 ```
 If you need more advanced inout functionality (using primitive types, etc), simply use the [`ref`](https://github.com/TooTallNate/ref) module.
 
+### Custom Classes
+Use the `objc.createClass` function to register custom classes with the Objective-C runtime:
+```js
+const objc = require('objc');
+
+const LKGreeter = objc.createClass('LKGreeter', 'NSObject', {
+  'greet:': (self, cmd, name) => {
+    name = objc.wrap(name);
+    return objc.ns(`Hello, ${name}!`);
+  },
+
+  _encodings: {
+    'greet:': ['@', ['@', ':', '@']]
+  }
+});
+
+LKGreeter.new().greet('Lukas'); // => 'Hello, Lukas!'
+```
+**Note**: You might have to specify individual offsets in the type encoding, see [this example](/examples/delegate.js).
+
 ## Roadmap
 In the future, I'd like to add support for:
-- creating custom objc classes
 - runtime introspection (accessing an object's properties, ivars, methods, etc)
 
 
