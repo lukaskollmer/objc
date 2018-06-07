@@ -750,6 +750,62 @@ test('[method swizzling] invalid parameters: method type', t => {
 });
 
 
+/*
+Creating Classes
+*/
+
+test('[custom class] instance methods', t => {
+  const {NSFileManager} = objc;
+
+  const LKClass = objc.createClass('LKClass1', 'NSObject', {
+    'add::': (self, cmd, a, b) => {
+      return a + b;
+    },
+
+    'getFileManager': (self, cmd) => {
+      return NSFileManager.defaultManager();
+    },
+
+    'doesntReturnAnything': (self, cmd) => {
+
+    },
+
+    _encodings: {
+      'add::': ['i24', ['@0', ':8', 'i16', 'i20']],
+      'getFileManager': ['@', ['@', ':']],
+      'doesntReturnAnything': ['v', ['@', ':']],
+    }
+  });
+
+  let obj = LKClass.new();
+
+  t.is(6, obj.add__(1, 5));
+  t.true(obj.getFileManager().isEqual_(NSFileManager.defaultManager()));
+  t.is(null, obj.doesntReturnAnything());
+})
+
+test('[custom class] class methods', t => {
+  const LKClass = objc.createClass('LKClass2', 'NSObject', {}, {
+    'someClassMethodThatReturnsFourtyTwo': (self, cmd) => {
+      return 42;
+    },
+
+    _encodings: {
+      'someClassMethodThatReturnsFourtyTwo': ['i', ['@', ':']]
+    }
+  });
+
+    t.is(42, LKClass.someClassMethodThatReturnsFourtyTwo());
+})
+
+
+test('[custom class] no methods', t => {
+  t.notThrows(() => {
+    const LKClass = objc.createClass('LKClass3', 'NSObject');
+  });
+})
+
+
 
 /*
 Miscellaneous
