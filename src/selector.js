@@ -44,8 +44,12 @@ const getPossibleSelectorNames = selector => {
 };
 
 class Selector {
-  constructor(name) {
-    this.ptr = runtime.sel_getUid(name);
+  constructor(input) {
+    if (typeof input === 'string') {
+      this.ptr = runtime.sel_getUid(input);
+    } else {
+      this.ptr = input;
+    }
   }
 
   get name() {
