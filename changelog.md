@@ -1,3 +1,6 @@
+### v0.16.0 (2018-06-28)
+- fixed a bug where passing a `objc.InstanceProxy` to `objc.ns` would return an empty JS object
+
 ### v0.15.0 (2018-06-07)
 - Added `objc.createClass`
 - The `objc.Selector` constructor can now also be called w/ a `SEL` pointer
