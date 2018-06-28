@@ -1,6 +1,6 @@
 {
   "name": "objc",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "NodeJS ⇆ Objective-C bridge",
   "license": "MIT",
   "repository": "lukaskollmer/objc",
