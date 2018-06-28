@@ -244,6 +244,24 @@ test('Type conversion ObjC -> JS: Array', t => {
   t.deepEqual(items, asArray);
 });
 
+test('Type Conversion: JS Array containing objc objects -> NSArray', t => {
+  const {NSArray, NSObject} = objc;
+
+  const obj1 = NSObject.new();
+  const obj2 = NSObject.new();
+  const obj3 = NSObject.new();
+
+
+  const input = [obj1, obj2, obj3];
+  const asNSArray = objc.ns(input);
+
+  t.true(asNSArray.isKindOfClass_(NSArray));
+  t.is(3, asNSArray.count());
+  t.true(asNSArray.objectAtIndex_(0).isEqual_(obj1));
+  t.true(asNSArray.objectAtIndex_(1).isEqual_(obj2));
+  t.true(asNSArray.objectAtIndex_(2).isEqual_(obj3));
+});
+
 // Date
 
 test('Type conversion JS -> ObjC: Date', t => {

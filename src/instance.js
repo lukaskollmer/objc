@@ -209,6 +209,10 @@ class Instance {
   static ns(object, hint = '@') {
     Instance.loadClassesIfNecessary();
 
+    if (object.___is_instance_proxy === true) {
+      return object;
+    }
+
     // String -> {NSString|SEL|Class}
     if (typeof object === 'string' || object instanceof String) {
       // Convert to NSString, SEL or Class, depending on the hint
