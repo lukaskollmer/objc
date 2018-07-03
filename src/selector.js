@@ -46,14 +46,14 @@ const getPossibleSelectorNames = selector => {
 class Selector {
   constructor(input) {
     if (typeof input === 'string') {
-      this.ptr = runtime.sel_getUid(input);
+      this.__ptr = runtime.sel_getUid(input);
     } else {
-      this.ptr = input;
+      this.__ptr = input;
     }
   }
 
   get name() {
-    return runtime.sel_getName(this.ptr);
+    return runtime.sel_getName(this.__ptr);
   }
 
   permutations() {

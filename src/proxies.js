@@ -55,7 +55,7 @@ function InstanceProxy(object) {
 
         return function * () {
           let nextObject;
-          while ((nextObject = enumerator.nextObject()) && !nextObject.ptr.isNull()) {
+          while ((nextObject = enumerator.nextObject()) && !nextObject.__ptr.isNull()) {
             yield nextObject;
           }
         };
@@ -64,8 +64,8 @@ function InstanceProxy(object) {
       // Might be a Symbol
       key = String(key);
 
-      if (key === 'ptr') {
-        return self.ptr;
+      if (key === '__ptr') {
+        return self.__ptr;
       } else if (key === '___is_instance_proxy') {
         return true;
       }
@@ -74,8 +74,8 @@ function InstanceProxy(object) {
     },
     set: (_, key, value) => {
       /* istanbul ignore next */
-      if (key === 'ptr') {
-        self.ptr = value;
+      if (key === '__ptr') {
+        self.__ptr = value;
         return true;
       }
       /* istanbul ignore next */

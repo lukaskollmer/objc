@@ -14,11 +14,11 @@ class Instance {
       throw new TypeError('Invalid arguments passed to the constructor');
     } else if (typeof args === 'string') {
       this.type = 'class';
-      this.ptr = runtime.objc_getClass(args);
+      this.__ptr = runtime.objc_getClass(args);
     } else {
       // TODO check whether the object is a class or an instance. object_isClass or something like that
       this.type = 'instance';
-      this.ptr = args;
+      this.__ptr = args;
     }
   }
 
@@ -28,9 +28,9 @@ class Instance {
 
   methodForSelector(selector) {
     if (this.type === 'class') {
-      return runtime.class_getClassMethod(this.ptr, selector.ptr);
+      return runtime.class_getClassMethod(this.__ptr, selector.__ptr);
     }
-    return runtime.class_getInstanceMethod(runtime.object_getClass(this.ptr), selector.ptr);
+    return runtime.class_getInstanceMethod(runtime.object_getClass(this.__ptr), selector.__ptr);
   }
 
   call(selector, ...argv) {
@@ -78,17 +78,17 @@ class Instance {
 
       const expectedArgumentType = runtime.method_copyArgumentType(method, idx);
 
-      if (arg !== null && typeof arg === 'object' && typeof arg.ptr !== 'undefined') {
+      if (arg !== null && typeof arg === 'object' && typeof arg.__ptr !== 'undefined') {
         if (expectedArgumentType === '^@') {
           inoutArgs.push(idx);
         }
-        return arg.ptr;
+        return arg.__ptr;
       }
 
       // If the method expects id, SEL or Class, we convert arg to the expected type and return the pointer
       if (['@', ':', '#'].includes(expectedArgumentType)) {
         const _obj = Instance.ns(arg, expectedArgumentType);
-        return _obj === null ? null : _obj.ptr;
+        return _obj === null ? null : _obj.__ptr;
       }
 
       return arg;
@@ -99,7 +99,7 @@ class Instance {
     let retval;
 
     try {
-      retval = msgSend(this.ptr, selector.ptr, ...args);
+      retval = msgSend(this.__ptr, selector.__ptr, ...args);
     } catch (err) {
       /* istanbul ignore if */
       if (err instanceof Error) {
@@ -112,7 +112,7 @@ class Instance {
 
     inoutArgs.forEach(idx => {
       idx -= 2; // Skip `self` and `_cmd`
-      argv[idx].ptr = argv[idx].ptr.deref();
+      argv[idx].__ptr = argv[idx].__ptr.deref();
     });
 
     if (retval instanceof Buffer && retval.isNull()) {
@@ -128,14 +128,14 @@ class Instance {
   }
 
   description() {
-    if (this.ptr === null || this.ptr.isNull()) {
+    if (this.__ptr === null || this.__ptr.isNull()) {
       return '(null)';
     }
     return this.call('debugDescription').UTF8String(); // eslint-disable-line new-cap
   }
 
   class() {
-    return runtime.class_getName(this.type === 'class' ? this.ptr : this.call('class'));
+    return runtime.class_getName(this.type === 'class' ? this.__ptr : this.call('class'));
   }
 
   static alloc() {

@@ -64,7 +64,7 @@ class Block {
 
       // Return the return value, unwrapping potential instance proxies
       if (retval !== null && retval.___is_instance_proxy === true) {
-        return retval.ptr;
+        return retval.__ptr;
       }
       return retval;
     });

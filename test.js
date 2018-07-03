@@ -106,7 +106,7 @@ test('description of instance method proxy', t => {
 
 test('description of null proxy', t => {
   const obj = objc.allocRef();
-  obj.ptr = obj.ptr.deref();
+  obj.__ptr = obj.__ptr.deref();
 
   const description = util.inspect(obj);
 
