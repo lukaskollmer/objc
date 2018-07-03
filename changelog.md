@@ -1,3 +1,7 @@
+### v0.17.0 (2018-07-03)
+- Added `Instance.isNull` (also exposed as `objc.isNull`) to check whether a `Instance` is holding a null pointer
+- Renamed `ptr` to `__ptr` to indicate that it's an internal field
+
 ### v0.16.0 (2018-06-28)
 - fixed a bug where passing a `objc.InstanceProxy` to `objc.ns` would return an empty JS object
 
