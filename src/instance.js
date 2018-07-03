@@ -142,6 +142,10 @@ class Instance {
     return new InstanceProxy(new Instance(ref.alloc(inoutType)));
   }
 
+  static isNull(instance) {
+    return instance.__ptr.isNull();
+  }
+
   static proxyForClass(classname) {
     return new InstanceProxy(new Instance(classname));
   }

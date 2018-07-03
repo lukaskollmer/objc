@@ -432,6 +432,8 @@ test('[inout parameters] `null` if not changed', t => {
   script.executeAndReturnError_(error);
 
   t.is(util.inspect(error), NULL_DESC);
+  t.true(objc.isNull(error));
+  t.true(objc.Instance.isNull(error));
 });
 
 

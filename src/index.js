@@ -20,7 +20,8 @@ const builtins = {
   js: Instance.js,
   ns: Instance.ns,
   wrap: obj => new InstanceProxy(new Instance(obj)),
-  allocRef: () => Instance.alloc()
+  allocRef: Instance.alloc,
+  isNull: Instance.isNull
 };
 
 module.exports = new Proxy({}, {
