@@ -1,3 +1,4 @@
+// eslint-disable-next-line camelcase
 const {sel_getUid, sel_getName} = require('./runtime');
 
 const cache = {};
