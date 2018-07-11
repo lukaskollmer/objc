@@ -215,6 +215,7 @@ LKGreeter.new().greet('Lukas'); // => 'Hello, Lukas!'
 
 ## Roadmap
 In the future, I'd like to add support for:
+- structs, c-style arrays, unions
 - runtime introspection (accessing an object's properties, ivars, methods, etc)
 
 
