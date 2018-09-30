@@ -31,27 +31,16 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 
 ### API
 
-#### objc.import(bundleName)
-Load a framework
+##### `objc.import(bundleName)`
+Import an Objective-C framework. Foundation is always imported by default
 
-#### objc.ns(object, [hint = '@'])
-Convert a JavaScript object to its objc equivalent. Returns `null` if the object doesn't have an ObjC counterpart  
+##### `objc.ns(object, [hint = '@'])`
+Convert a JavaScript object to its objc equivalent. Returns `null` if the object doesn't have an objc counterpart.  
 Takes an optional second parameter to specify whether strings should be converted to `NSString` objects (default), `SEL` or `Class`
 
-#### objc.js(object, [returnInputIfUnableToConvert = false])
-Convert an objc object to its JavaScript equivalent
-Takes an optional second parameter indicating whether it should return `null` or the input if the object doesn't have a JS counterpart
-
-**Type Conversion**
-
-| JavaScript | Objective-C  |
-| :--------- | :----------- |
-| String     | NSString     |
-| Date       | NSDate       |
-| Number     | NSNumber     |
-| Array      | NSArray      |
-| Object     | NSDictionary |
-
+##### `objc.js(object, [returnInputIfUnableToConvert = false])`
+Convert an objc object to its JavaScript equivalent.  
+Takes an optional second parameter to specify whether it should return `null` or the input if the object doesn't have a JS counterpart
 
 ### Calling methods
 
@@ -76,7 +65,7 @@ objc.import('AppKit');
 
 const {NSPasteboard, NSPasteboardTypeString} = objc;
 
-let pasteboard = NSPasteboard.generalPasteboard();
+const pasteboard = NSPasteboard.generalPasteboard();
 pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
 
 pasteboard.setString_forType_("44 > 45", NSPasteboardTypeString);
@@ -109,7 +98,7 @@ const block = new objc.Block(() => {
 When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters.
 
 **Note**  
-When a block takes an Objective-C object as its parameter, you'll need to manually wrap that object in an `objc.Proxy` (via the `objc.wrap` helper function).
+If a block takes an Objective-C object as its parameter, you'll need to manually wrap that object in an `objc.Proxy` (via the `objc.wrap` helper function).
 
 <br>
 
@@ -118,10 +107,10 @@ When a block takes an Objective-C object as its parameter, you'll need to manual
 const {NSArray, Block, wrap} = objc;
 const array = NSArray.arrayWithArray_(['I', 'Am', 'The', 'Doctor']);
 
-const block = new Block((obj1, obj2) => {
-  obj1 = wrap(obj1);
-  obj2 = wrap(obj2);
-  return obj1.length() > obj2.length() ? -1 : 1;
+const block = new Block((arg1, arg2) => {
+  arg1 = wrap(arg1);
+  arg2 = wrap(arg2);
+  return arg1.length() > arg2.length() ? -1 : 1;
 }, 'q', ['@', '@']);  // NSComparator returns a NSInteger and takes two ids
 
 const sorted = array.sortedArrayUsingComparator_(block);
@@ -215,10 +204,10 @@ LKGreeter.new().greet('Lukas'); // => 'Hello, Lukas!'
 
 ## Roadmap
 In the future, I'd like to add support for:
-- structs, c-style arrays, unions
+- structs, c-style arrays, unions as method parameter/return type
 - runtime introspection (accessing an object's properties, ivars, methods, etc)
-
+- improved class creation api
+- improved support for inout parameters (`id*`)
 
 ## License
-
 MIT © [Lukas Kollmer](https://lukaskollmer.me)
