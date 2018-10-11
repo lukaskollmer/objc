@@ -147,10 +147,6 @@ class Instance {
   static isNull(instance) {
     return instance.__ptr.isNull();
   }
-
-  //static _proxyForClass(classname) {
-  //  return new InstanceProxy(new Instance(classname));
-  //}
 }
 
 module.exports = Instance;

@@ -4,12 +4,11 @@ const {InstanceProxy} = require('./proxies');
 
 const proxyForClass = classname => {
   return new InstanceProxy(new Instance(classname));
-}
+};
 
 const [
   NSDate, NSString, NSNumber, NSArray, NSMutableArray, NSDictionary, NSMutableDictionary
 ] = ['NSDate', 'NSString', 'NSNumber', 'NSArray', 'NSMutableArray', 'NSDictionary', 'NSMutableDictionary'].map(cls => proxyForClass(cls));
-
 
 const js = (object, returnInputIfUnableToConvert = false) => {
   if (object.isKindOfClass_(NSString)) {
@@ -45,15 +44,6 @@ const js = (object, returnInputIfUnableToConvert = false) => {
   return returnInputIfUnableToConvert ? object : null;
 };
 
-
-// 'Convert' a JavaScript object to its objc counterpart
-// String -> NSString
-// Date   -> NSDate
-// Number -> NSNumber
-// Array  -> NSArray
-// Object -> NSDictionary
-// note: this function accepts a second parameter, which is a hint as to the expected type encoding of the objc object.
-//       the default value is '@' (aka id in objc land), but you can specify ':' or '#' to convert strings to Selectors or Classes
 const ns = (object, hint = '@') => {
   if (object.___is_instance_proxy === true) {
     return object;
@@ -111,5 +101,7 @@ const retainedGlobals = [];
 module.exports = {
   js,
   ns,
-  _retainGlobal: obj => { retainedGlobals.push(obj) },
+  _retainGlobal: obj => {
+    retainedGlobals.push(obj);
+  }
 };
