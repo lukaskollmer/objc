@@ -4,8 +4,8 @@ const Block = require('./block');
 const Selector = require('./selector');
 const swizzle = require('./swizzle');
 const createClass = require('./create-class');
-
 const {InstanceProxy, MethodProxy} = require('./proxies');
+const {js, ns} = require('./util');
 
 const builtins = {
   runtime,
@@ -17,8 +17,8 @@ const builtins = {
   swizzle,
   createClass,
   import: runtime.import,
-  js: Instance.js,
-  ns: Instance.ns,
+  js,
+  ns,
   wrap: obj => new InstanceProxy(new Instance(obj)),
   allocRef: Instance.alloc,
   isNull: Instance.isNull

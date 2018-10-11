@@ -5,8 +5,8 @@ const types = require('./types');
 const {InstanceProxy} = require('./proxies');
 const Block = require('./block');
 
+let ns;
 const inoutType = ref.refType(ref.refType(ref.types.void));
-const cls = {}; // Internally cached objc classes used for converting objects between js and objc land
 
 class Instance {
   constructor(args) {
@@ -87,7 +87,9 @@ class Instance {
 
       // If the method expects id, SEL or Class, we convert arg to the expected type and return the pointer
       if (['@', ':', '#'].includes(expectedArgumentType)) {
-        const _obj = Instance.ns(arg, expectedArgumentType);
+        // We have to delay requiring ./util until here to work around the circular dependency (util also requires Instance)
+        ns = ns || require('./util').ns;
+        const _obj = ns(arg, expectedArgumentType);
         return _obj === null ? null : _obj.__ptr;
       }
 
@@ -146,123 +148,9 @@ class Instance {
     return instance.__ptr.isNull();
   }
 
-  static proxyForClass(classname) {
-    return new InstanceProxy(new Instance(classname));
-  }
-
-  static loadClassesIfNecessary() {
-    if (Object.getOwnPropertyNames(cls).length !== 0) {
-      return;
-    }
-
-    [
-      'NSDate',
-      'NSString',
-      'NSNumber',
-      'NSArray',
-      'NSMutableArray',
-      'NSDictionary',
-      'NSMutableDictionary'
-    ].forEach(name => { cls[name] = Instance.proxyForClass(name); }); // eslint-disable-line brace-style
-  }
-
-  static js(object, returnInputIfUnableToConvert = false) {
-    Instance.loadClassesIfNecessary();
-
-    if (object.isKindOfClass_(cls.NSString)) {
-      return object.UTF8String(); // eslint-disable-line new-cap
-    }
-
-    if (object.isKindOfClass_(cls.NSNumber)) {
-      return object.doubleValue();
-    }
-
-    if (object.isKindOfClass_(cls.NSDate)) {
-      return new Date(object.timeIntervalSince1970() * 1000);
-    }
-
-    if (object.isKindOfClass_(cls.NSArray)) {
-      const newArray = [];
-      for (const obj of object) {
-        newArray.push(Instance.js(obj, true));
-      }
-      return newArray;
-    }
-
-    if (object.isKindOfClass_(cls.NSDictionary)) {
-      const newObject = {};
-      for (const key of object) {
-        newObject[String(key)] = Instance.js(object.objectForKey_(key), true);
-      }
-
-      return newObject;
-    }
-
-    // Return null if there's no JS counterpart for the objc type
-    return returnInputIfUnableToConvert ? object : null;
-  }
-
-  // 'Convert' a JavaScript object to its objc counterpart
-  // String -> NSString
-  // Date   -> NSDate
-  // Number -> NSNumber
-  // Array  -> NSArray
-  // Object -> NSDictionary
-  // note: this function accepts a second parameter, which is a hint as to the expected type encoding of the objc object.
-  //       the default value is '@' (aka id in objc land), but you can specify ':' or '#' to convert strings to Selectors or Classes
-  static ns(object, hint = '@') {
-    Instance.loadClassesIfNecessary();
-
-    if (object.___is_instance_proxy === true) {
-      return object;
-    }
-
-    // String -> {NSString|SEL|Class}
-    if (typeof object === 'string' || object instanceof String) {
-      // Convert to NSString, SEL or Class, depending on the hint
-      if (hint === '@') {
-        return cls.NSString.stringWithUTF8String_(object);
-      } else if (hint === ':') {
-        return new Selector(object);
-      }
-      return Instance.proxyForClass(object);
-    }
-
-    // Date -> NSDate
-    if (object instanceof Date) {
-      const secondsSince1970 = Number(object) / 1000;
-      return cls.NSDate.dateWithTimeIntervalSince1970_(secondsSince1970);
-    }
-
-    // Array -> NSArray
-    if (Array.isArray(object)) {
-      const newArray = cls.NSMutableArray.array();
-
-      for (let i = 0; i < object.length; i++) {
-        newArray.addObject_(this.ns(object[i]));
-      }
-      return newArray;
-    }
-
-    // Number -> NSNumber
-    if (typeof object === 'number') {
-      return cls.NSNumber.numberWithDouble_(object);
-    }
-
-    // Object -> NSDictionary
-    if (typeof object === 'object') {
-      const dictionary = cls.NSMutableDictionary.new();
-
-      for (const key of Object.getOwnPropertyNames(object)) {
-        dictionary.setObject_forKey_(object[key], key);
-      }
-
-      return dictionary;
-    }
-
-    // Return null if there's no objc counterpart for the js type
-    return null;
-  }
+  //static _proxyForClass(classname) {
+  //  return new InstanceProxy(new Instance(classname));
+  //}
 }
 
 module.exports = Instance;
