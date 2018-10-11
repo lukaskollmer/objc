@@ -412,7 +412,7 @@ test('inout parameters 1 (^@)', t => {
   t.is(error2.code(), 4); // NSFileNoSuchFileError
 });
 
-test('inout parameters 2 (^@)', t => {
+test.skip('inout parameters 2 (^@)', t => {
   const {NSDictionary, NSAppleScript} = objc;
 
   const script = NSAppleScript.alloc().initWithSource_('telll application "Safari" to get URL of current tab of window 1');
@@ -424,7 +424,7 @@ test('inout parameters 2 (^@)', t => {
   t.true(error.isKindOfClass_(NSDictionary));
 });
 
-test('[inout parameters] `null` if not changed', t => {
+test.skip('[inout parameters] `null` if not changed', t => {
   const {NSAppleScript} = objc;
 
   const script = NSAppleScript.alloc().initWithSource_(`tell application "System Events" to get name of current user`);
