@@ -403,6 +403,7 @@ test('inout parameters 1 (^@)', t => {
 
   t.is(success1, true);
   t.is(util.inspect(error1), NULL_DESC);
+  t.true(objc.Instance.isNull(error1));
 
   const error2 = objc.allocRef();
   const success2 = fm.removeItemAtPath_error_(filepath, error2);
@@ -791,7 +792,8 @@ test('[custom class] instance methods', t => {
     },
 
     _encodings: {
-      'add::': ['i24', ['@0', ':8', 'i16', 'i20']],
+      //'add::': ['i24', ['@0', ':8', 'i16', 'i20']],
+      'add::': ['Q', ['@', ':', 'Q', 'Q']],
       'getFileManager': ['@', ['@', ':']],
       'doesntReturnAnything': ['v', ['@', ':']],
     }
@@ -818,12 +820,69 @@ test('[custom class] class methods', t => {
     t.is(42, LKClass.someClassMethodThatReturnsFourtyTwo());
 })
 
-
 test('[custom class] no methods', t => {
   t.notThrows(() => {
     const LKClass = objc.createClass('LKClass3', 'NSObject');
   });
 })
+
+
+/*
+Structs
+*/
+
+let NSRange = null;
+
+
+test('[structs] error if struct hasnt been defined', t => {
+  t.throws(() => {
+    objc.ns('Hello World').rangeOfString_('Hello');
+  });
+});
+
+test('[struct] define struct', t => {
+  t.notThrows(() => {
+    NSRange = objc.defineStruct('_NSRange', {
+      location: objc.refTypes.ulonglong,
+      length: objc.refTypes.ulonglong
+    });
+  });
+
+  t.not(NSRange, null);
+
+  t.throws(() => {
+    objc.defineStruct('_NSRange', {});
+  });
+});
+
+test('[struct] pass struct as parameter', t => {
+  const range = new NSRange();
+  range.location = 3;
+  range.length = 5;
+
+  t.is('lo Wo', String(objc.ns('Hello World').substringWithRange_(range)));
+});
+
+test('[struct] struct as return type', t => {
+  const string = objc.ns('Hello World');
+  const range = string.rangeOfString_('lo Wo');
+  t.is(3, range.location);
+  t.is(5, range.length);
+});
+
+test('[struct] struct defined in objc module works with ffi module', t => {
+  const ffi = require('ffi');
+  const libFoundation = new ffi.Library(null, {
+    NSStringFromRange: ['pointer', [NSRange]]
+  });
+
+  const range = new NSRange();
+  range.location = 42;
+  range.length = 12;
+
+  const string = objc.wrap(libFoundation.NSStringFromRange(range));
+  t.is('{42, 12}', String(string));
+});
 
 
 
@@ -845,4 +904,87 @@ test('get username using NSProcessInfo, convert to javascript string and compare
   const username = processInfo.userName();
 
   t.is(String(username), os.userInfo().username);
+});
+
+
+/*
+Type Encoding Parser
+*/
+const {
+  TypeEncodingParser,
+  DataStructurePrimitive,
+  DataStructurePointer,
+  DataStructureArray,
+  DataStructureStruct,
+  DataStructureUnion,
+  mapping: typeEncodingMappings
+} = require('./src/type-encodings');
+
+const parser = new TypeEncodingParser();
+
+test('[type encoding parser] parse primitives', t => {
+  for (const [key, value] of Object.entries(typeEncodingMappings)) {
+    let expectedType;
+    if (value == 'pointer') {
+      expectedType = new DataStructurePointer(new DataStructurePrimitive('void'));
+    } else {
+      expectedType = new DataStructurePrimitive(value);
+    }
+
+    t.deepEqual(expectedType, parser.parse(key));
+  }
+});
+
+test('[type encoding parser] parse array / struct / union / const attribute', t => {
+  const voidPtrType = new DataStructurePointer(new DataStructurePrimitive('void'));
+
+  const testCases = {
+    '[12^f]': new DataStructureArray(12, new DataStructurePointer(new DataStructurePrimitive('float'))),
+    '[12r^Q]': (() => {
+      const elementType = new DataStructurePointer(new DataStructurePrimitive('ulonglong'));
+      elementType.isConst = true;
+      return new DataStructureArray(12, elementType);
+    })(),
+    '[12^rS]': (() => {
+      const type = new DataStructurePrimitive('ushort');
+      type.isConst = true;
+      return new DataStructureArray(12, new DataStructurePointer(type));
+    })(),
+    'i40': new DataStructurePrimitive('int32'),
+    '{_NSRange=QQ}': new DataStructureStruct('_NSRange', [
+      new DataStructurePrimitive('ulonglong'),
+      new DataStructurePrimitive('ulonglong')
+    ]),
+    '(_ByteAccess=q[8C])': new DataStructureUnion('_ByteAccess', [
+      new DataStructurePrimitive('longlong'),
+      new DataStructureArray(8, new DataStructurePrimitive('uchar'))
+    ]),
+    '{_Foo=i^{?}^^@@?^?(?=q*)}': new DataStructureStruct('_Foo', [
+      new DataStructurePrimitive('int32'),
+      new DataStructurePointer(new DataStructureStruct('?', [])),
+      new DataStructurePointer(new DataStructurePointer(voidPtrType)),
+      voidPtrType, // `@?`, the block
+      new DataStructurePointer(voidPtrType), // `^?`, something like a function pointer
+      new DataStructureUnion('?', [
+        new DataStructurePrimitive('longlong'),
+        new DataStructurePrimitive('string')
+      ])
+    ])
+  };
+
+  for (const [encoding, expectedType] of Object.entries(testCases)) {
+    t.deepEqual(expectedType, parser.parse(encoding));
+  }
+
+  const invalidTestCases = [
+    '[q]',
+    '[0q]',
+    '{?=C',
+    '8i'
+  ];
+  for (const encoding of invalidTestCases) {
+    t.throws(() => {
+      console.log(parser.parse(encoding));
+    });
+  }
 });

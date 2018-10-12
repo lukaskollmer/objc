@@ -1,9 +1,9 @@
 const ref = require('ref');
 const runtime = require('./runtime');
 const Selector = require('./selector');
-const types = require('./types');
 const {InstanceProxy} = require('./proxies');
 const Block = require('./block');
+const {typeEncodingToRefType} = require('./type-encodings');
 
 let ns;
 const inoutType = ref.refType(ref.refType(ref.types.void));
@@ -57,11 +57,10 @@ class Instance {
     const expectedNumberOfArguments = runtime.method_getNumberOfArguments(method);
 
     const argumentTypes = [...Array(expectedNumberOfArguments).keys()].map(i => {
-      const expected = runtime.method_copyArgumentType(method, i);
-      return types[expected];
+      return typeEncodingToRefType(runtime.method_copyArgumentType(method, i));
     });
 
-    const returnType = runtime.method_copyReturnType(method);
+    const returnTypeEncoding = runtime.method_copyReturnType(method);
 
     const inoutArgs = []; // Indices of inout args (ie `NSError **`)
 
@@ -85,7 +84,7 @@ class Instance {
         return arg.__ptr;
       }
 
-      // If the method expects id, SEL or Class, we convert arg to the expected type and return the pointer
+      // If the method expects id, SEL or Class, we convert `arg` to the expected type and return the pointer
       if (['@', ':', '#'].includes(expectedArgumentType)) {
         // We have to delay requiring ./util until here to work around the circular dependency (util also requires Instance)
         ns = ns || require('./util').ns;
@@ -96,7 +95,8 @@ class Instance {
       return arg;
     });
 
-    const msgSend = runtime.msgSend(types[returnType], argumentTypes);
+    const returnType = typeEncodingToRefType(returnTypeEncoding);
+    const msgSend = runtime.msgSend(returnType, argumentTypes);
 
     let retval;
 
@@ -121,9 +121,10 @@ class Instance {
       return null;
     }
 
-    if (returnType === '@') {
+    if (returnTypeEncoding === '@') {
       return InstanceProxy(new Instance(retval)); // eslint-disable-line new-cap
-    } else if (returnType === 'c') {
+    } else if (returnTypeEncoding === 'c') {
+      // TODO This means that we can't return chars, which is bad. Find a solution to support both!
       return Boolean(retval);
     }
     return retval;

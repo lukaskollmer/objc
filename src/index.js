@@ -1,3 +1,4 @@
+const ref = require('ref');
 const runtime = require('./runtime');
 const Instance = require('./instance');
 const Block = require('./block');
@@ -6,8 +7,10 @@ const swizzle = require('./swizzle');
 const createClass = require('./create-class');
 const {InstanceProxy, MethodProxy} = require('./proxies');
 const {js, ns} = require('./util');
+const {defineStruct} = require('./structs');
 
 const builtins = {
+  refTypes: ref.types,
   runtime,
   Instance,
   InstanceProxy,
@@ -19,6 +22,7 @@ const builtins = {
   import: runtime.import,
   js,
   ns,
+  defineStruct,
   wrap: obj => new InstanceProxy(new Instance(obj)),
   allocRef: Instance.alloc,
   isNull: Instance.isNull

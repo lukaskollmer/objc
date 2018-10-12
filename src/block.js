@@ -1,7 +1,7 @@
 const ffi = require('ffi');
 const struct = require('ref-struct');
 const runtime = require('./runtime');
-const types = require('./types');
+const {typeEncodingToRefType} = require('./type-encodings');
 
 // eslint-disable-next-line camelcase
 const __block_literal = struct({
@@ -29,7 +29,7 @@ class Block {
     }
 
     this.fn = fn;
-    this.returnType = types[returnType.charAt(0)];
+    this.returnType = typeEncodingToRefType(returnType);
     this.argumentTypes = argumentTypes;
 
     this.skipBlockArgument = skipBlockArgument;
@@ -37,7 +37,7 @@ class Block {
     if (skipBlockArgument) {
       this.argumentTypes.splice(0, 0, '@'); // 1st argument is the block itself
     }
-    this.argumentTypes = this.argumentTypes.map(type => types[type.charAt(0)]);
+    this.argumentTypes = this.argumentTypes.map(type => typeEncodingToRefType(type));
   }
 
   makeBlock() {
