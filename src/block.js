@@ -2,7 +2,7 @@
 const ffi = require('ffi');
 const struct = require('ref-struct');
 const runtime = require('./runtime');
-const {typeEncodingToRefType} = require('./type-encodings');
+const {coerceType} = require('./type-encodings');
 
 const __block_literal = struct({
   isa: 'pointer',
@@ -23,12 +23,12 @@ descriptor.Block_size = __block_literal.size;
 
 class Block {
   constructor(fn, returnType, argumentTypes, skipBlockArgument = true) {
-    if (typeof fn !== 'function' || typeof returnType !== 'string' || argumentTypes === undefined) {
-      throw new TypeError('Invalid arguments passed to Block constructor');
+    if (typeof fn !== 'function' || returnType === undefined || argumentTypes === undefined) {
+      throw new TypeError('The objc.Block constructor expects a function');
     }
 
     this.fn = fn;
-    this.returnType = typeEncodingToRefType(returnType);
+    this.returnType = coerceType(returnType);
     this.argumentTypes = argumentTypes;
 
     this.skipBlockArgument = skipBlockArgument;
@@ -36,7 +36,7 @@ class Block {
     if (skipBlockArgument) {
       this.argumentTypes.splice(0, 0, '@'); // 1st argument is the block itself
     }
-    this.argumentTypes = this.argumentTypes.map(type => typeEncodingToRefType(type));
+    this.argumentTypes = this.argumentTypes.map(type => coerceType(type));
   }
 
   makeBlock() {

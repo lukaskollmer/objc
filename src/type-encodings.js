@@ -248,7 +248,13 @@ module.exports = {
   DataStructureArray,
   DataStructureUnion,
 
-  typeEncodingToRefType: encoding => {
-    return parser.parse(encoding).toRefType();
+  coerceType: type => {
+    if (typeof type === 'string') {
+      return parser.parse(type).toRefType();
+    } else if (typeof type === 'object') {
+      return type;
+    }
+
+    throw new TypeError(`Unable to coerce type from ${type}`);
   }
 };

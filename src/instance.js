@@ -3,7 +3,7 @@ const runtime = require('./runtime');
 const Selector = require('./selector');
 const {InstanceProxy} = require('./proxies');
 const Block = require('./block');
-const {typeEncodingToRefType} = require('./type-encodings');
+const {coerceType} = require('./type-encodings');
 
 let ns;
 const inoutType = ref.refType(ref.refType(ref.types.void));
@@ -57,7 +57,7 @@ class Instance {
     const expectedNumberOfArguments = runtime.method_getNumberOfArguments(method);
 
     const argumentTypes = [...Array(expectedNumberOfArguments).keys()].map(i => {
-      return typeEncodingToRefType(runtime.method_copyArgumentType(method, i));
+      return coerceType(runtime.method_copyArgumentType(method, i));
     });
 
     const returnTypeEncoding = runtime.method_copyReturnType(method);
@@ -95,7 +95,7 @@ class Instance {
       return arg;
     });
 
-    const returnType = typeEncodingToRefType(returnTypeEncoding);
+    const returnType = coerceType(returnTypeEncoding);
     const msgSend = runtime.msgSend(returnType, argumentTypes);
 
     let retval;
