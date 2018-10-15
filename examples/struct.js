@@ -18,7 +18,8 @@ const CGRect = objc.defineStruct('CGRect', {
 });
 
 const libFoundation = new ffi.Library(null, {
-  NSStringFromRect: ['pointer', [CGRect]]
+  NSStringFromRect: ['pointer', [CGRect]],
+  NSRectFromString: [CGRect, ['pointer']]
 });
 const rect = CGRect.new(
   CGPoint.new(5, 10),
@@ -26,3 +27,19 @@ const rect = CGRect.new(
 );
 const string = objc.wrap(libFoundation.NSStringFromRect(rect));
 console.log(string);
+
+const string2 = objc.ns('{{1, 2}, {3, 4}}');
+const rect2 = libFoundation.NSRectFromString(string2.__ptr);
+console.log(rect2);
+console.log(`
+Rect {
+  origin: {
+    x: ${rect2.origin.x}
+    y: ${rect2.origin.y}
+  },
+  size: {
+    width:  ${rect2.size.width}
+    height: ${rect2.size.height}
+  }
+}
+`);
