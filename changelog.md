@@ -1,4 +1,4 @@
-### v0.18.8 (2018-10-15)
+### v0.18.0 (2018-10-15)
 - Added struct support
 - Improved type encoding handling
 
