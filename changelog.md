@@ -1,3 +1,7 @@
+### v0.18.8 (2018-10-15)
+- Added struct support
+- Improved type encoding handling
+
 ### v0.17.0 (2018-07-03)
 - Added `Instance.isNull` (also exposed as `objc.isNull`) to check whether a `Instance` is holding a null pointer
 - Renamed `ptr` to `__ptr` to indicate that it's an internal field
