@@ -1,4 +1,3 @@
-const ref = require('ref');
 const runtime = require('./runtime');
 const Instance = require('./instance');
 const Block = require('./block');
@@ -8,9 +7,10 @@ const createClass = require('./create-class');
 const {InstanceProxy, MethodProxy} = require('./proxies');
 const {js, ns} = require('./util');
 const {defineStruct} = require('./structs');
+const types = require('./types');
 
 const builtins = {
-  refTypes: ref.types,
+  ...types,
   runtime,
   Instance,
   InstanceProxy,
