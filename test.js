@@ -866,7 +866,7 @@ test('[struct] define/use existing struct', t => {
 })
 
 
-const {NSRange} = objc;
+const {NSRange} = objc.types;
 
 test('[struct] pass struct as parameter', t => {
   const range = NSRange.new();
@@ -1018,8 +1018,8 @@ test('[type encoding parser] parse array / struct / union / const attribute', t 
 });
 
 test('[type encoding parser / coerceType] can use strings and type objects interchangeably', t => {
-  t.is(coerceType('I'), coerceType(objc.uint32));
-  t.is(coerceType('r*'), coerceType(objc.CString));
+  t.is(coerceType('I'), coerceType(objc.types.uint32));
+  t.is(coerceType('r*'), coerceType(objc.types.CString));
 
   t.throws(() => coerceType(12));
 });

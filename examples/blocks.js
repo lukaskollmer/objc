@@ -1,6 +1,7 @@
 const objc = require('../');
 
-const {wrap, NSInteger, id} = objc;
+const {wrap} = objc;
+const {id, NSInteger} = objc.types;
 
 const array = objc.ns(['i', 'am', 'the', 'doctor']);
 

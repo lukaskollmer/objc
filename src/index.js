@@ -10,7 +10,7 @@ const {defineStruct} = require('./structs');
 const types = require('./types');
 
 const builtins = {
-  ...types,
+  types,
   runtime,
   Instance,
   InstanceProxy,
