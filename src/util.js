@@ -1,16 +1,31 @@
+/* eslint-disable no-multi-assign */
+
 const Selector = require('./selector');
 const Instance = require('./instance');
 const {InstanceProxy} = require('./proxies');
 
-const proxyForClass = classname => {
-  return new InstanceProxy(new Instance(classname));
+const retainedGlobals = [];
+module.exports._retainGlobal = obj => {
+  retainedGlobals.push(obj);
 };
 
-const [
-  NSDate, NSString, NSNumber, NSArray, NSMutableArray, NSDictionary, NSMutableDictionary
-] = ['NSDate', 'NSString', 'NSNumber', 'NSArray', 'NSMutableArray', 'NSDictionary', 'NSMutableDictionary'].map(cls => proxyForClass(cls));
+const proxyForClass = classname => new InstanceProxy(new Instance(classname));
 
-const js = (object, returnInputIfUnableToConvert = false) => {
+const ClassLoader = new Proxy({}, {
+  get: (_, classname) => proxyForClass(classname)
+});
+
+const {
+  NSBundle, NSDate, NSString, NSNumber, NSArray, NSMutableArray, NSDictionary, NSMutableDictionary
+} = ClassLoader;
+
+module.exports.importFramework = name => {
+  const path = name.includes('/') ? name : `/System/Library/Frameworks/${name}.framework`;
+  const bundle = NSBundle.bundleWithPath_(path);
+  bundle.load();
+};
+
+const js = module.exports.js = (object, returnInputIfUnableToConvert = false) => {
   if (object.isKindOfClass_(NSString)) {
     return object.UTF8String(); // eslint-disable-line new-cap
   }
@@ -44,7 +59,7 @@ const js = (object, returnInputIfUnableToConvert = false) => {
   return returnInputIfUnableToConvert ? object : null;
 };
 
-const ns = (object, hint = '@') => {
+const ns = module.exports.ns = (object, hint = '@') => {
   if (object.___is_instance_proxy === true) {
     return object;
   }
@@ -94,14 +109,4 @@ const ns = (object, hint = '@') => {
 
   // Return null if there's no objc counterpart for the js type
   return null;
-};
-
-const retainedGlobals = [];
-
-module.exports = {
-  js,
-  ns,
-  _retainGlobal: obj => {
-    retainedGlobals.push(obj);
-  }
 };

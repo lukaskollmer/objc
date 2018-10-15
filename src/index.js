@@ -5,7 +5,7 @@ const Selector = require('./selector');
 const swizzle = require('./swizzle');
 const createClass = require('./create-class');
 const {InstanceProxy, MethodProxy} = require('./proxies');
-const {js, ns} = require('./util');
+const {js, ns, importFramework} = require('./util');
 const {defineStruct} = require('./structs');
 const types = require('./types');
 
@@ -19,7 +19,7 @@ const builtins = {
   Selector,
   swizzle,
   createClass,
-  import: runtime.import,
+  import: importFramework,
   js,
   ns,
   defineStruct,
