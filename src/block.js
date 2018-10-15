@@ -1,9 +1,9 @@
+/* eslint-disable camelcase */
 const ffi = require('ffi');
 const struct = require('ref-struct');
 const runtime = require('./runtime');
 const {typeEncodingToRefType} = require('./type-encodings');
 
-// eslint-disable-next-line camelcase
 const __block_literal = struct({
   isa: 'pointer',
   flags: 'int32',
@@ -12,15 +12,14 @@ const __block_literal = struct({
   descriptor: 'pointer'
 });
 
-// eslint-disable-next-line camelcase, no-unused-vars
 const __block_descriptor = struct({
   reserved: 'ulonglong',
-  Block_size: 'ulonglong' // eslint-disable-line camelcase
+  Block_size: 'ulonglong'
 });
 
 const descriptor = new __block_descriptor();
 descriptor.reserved = 0;
-descriptor.Block_size = __block_literal.size; // eslint-disable-line camelcase
+descriptor.Block_size = __block_literal.size;
 
 class Block {
   constructor(fn, returnType, argumentTypes, skipBlockArgument = true) {
