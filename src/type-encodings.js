@@ -7,7 +7,7 @@ const structs = require('./structs');
 // - The `TypeEncodingParser` class, which is a simple recursive descent parser
 //   for parsing an objective-c type encoding string
 // - DataStructure{Primitive|Pointer|Struct|Array|Union}, describing the parsed type encoding
-// Note:
+// Notes:
 //   - The `DataStructure` classes all have a `toRefType` function, which returns
 //     a type object compatible with the `ffi`, `ref` and `ref-struct` modules
 //   - Currently, this is only supported for primitives, pointers and structs
@@ -120,7 +120,6 @@ class TypeEncodingParser {
 
   step() {
     this.position += 1;
-    return this._currentToken;
   }
 
   parse(encoding) {
