@@ -829,18 +829,18 @@ test('[custom class] no methods', t => {
 
 /*
 Structs
+
+skipping the first two since NSRange is already declared in the objc module
+TODO: Find some obscure/rarely used struct in Foundation, use that for the test
 */
 
-let NSRange = null;
-
-
-test('[structs] error if struct hasnt been defined', t => {
+test.skip('[struct] use not-yet defined struct', t => {
   t.throws(() => {
     objc.ns('Hello World').rangeOfString_('Hello');
   });
 });
 
-test('[struct] define struct', t => {
+test.skip('[struct] define struct', t => {
   t.notThrows(() => {
     NSRange = objc.defineStruct('_NSRange', {
       location: objc.refTypes.ulonglong,
@@ -855,12 +855,39 @@ test('[struct] define struct', t => {
   });
 });
 
+test('[struct] define/use existing struct', t => {
+  t.throws(() => {
+    objc.defineStruct('_NSRange', {});
+  });
+
+  t.throws(() => {
+    coerceType('{LKRange=qq}');
+  });
+})
+
+
+const {NSRange} = objc;
+
 test('[struct] pass struct as parameter', t => {
-  const range = new NSRange();
+  const range = NSRange.new();
   range.location = 3;
   range.length = 5;
 
   t.is('lo Wo', String(objc.ns('Hello World').substringWithRange_(range)));
+});
+
+test('[struct] pass field values in initializer', t => {
+  const range = NSRange.new(8, 11);
+  t.is(8, range.location);
+  t.is(11, range.length);
+
+  t.is('pretty cool', String(objc.ns('This is pretty cool').substringWithRange_(range)));
+});
+
+test('[struct] call initializer with invalid arguments', t => {
+  t.throws(() => {
+    NSRange.new(1);
+  });
 });
 
 test('[struct] struct as return type', t => {
@@ -917,7 +944,8 @@ const {
   DataStructureArray,
   DataStructureStruct,
   DataStructureUnion,
-  mapping: typeEncodingMappings
+  mapping: typeEncodingMappings,
+  coerceType
 } = require('./src/type-encodings');
 
 const parser = new TypeEncodingParser();
@@ -984,7 +1012,14 @@ test('[type encoding parser] parse array / struct / union / const attribute', t 
   ];
   for (const encoding of invalidTestCases) {
     t.throws(() => {
-      console.log(parser.parse(encoding));
+      parser.parse(encoding);
     });
   }
+});
+
+test('[type encoding parser / coerceType] can use strings and type objects interchangeably', t => {
+  t.is(coerceType('I'), coerceType(objc.uint32));
+  t.is(coerceType('r*'), coerceType(objc.CString));
+
+  t.throws(() => coerceType(12));
 });
