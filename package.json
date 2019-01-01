@@ -10,9 +10,6 @@
     "url": "lukaskollmer.me"
   },
   "main": "./src/index.js",
-  "engines": {
-    "node": ">=8 <9"
-  },
   "scripts": {
     "test_": "ava --verbose --serial",
     "test": "xo && nyc ava --verbose --serial"
