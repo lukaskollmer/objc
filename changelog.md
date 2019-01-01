@@ -1,3 +1,7 @@
+### v0.19.0 (2019-01-01)
+- Update the ffi module
+- Update supported node versions to >=8
+
 ### v0.18.0 (2018-10-15)
 - Added struct support
 - Improved type encoding handling
