@@ -29,6 +29,21 @@ test('class exists', t => {
   t.false(objc.runtime.classExists('ClassThatDoesntExist'));
 });
 
+/*
+Framework loading
+*/
+
+test('[objc.import] import framework by absolute path', t => {
+  objc.import('/System/Library/Frameworks/AppKit.framework');
+  t.true(objc.runtime.classExists('NSApplication'));
+});
+
+// TODO find some other framework to import
+//test('[objc.import] import framework by name', t => {
+//  objc.import('CoreData');
+//  t.true(objc.runtime.classExists('NSManagedObject'));
+//})
+
 
 /*
 Class metadata (not yet implemented)
