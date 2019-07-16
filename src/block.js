@@ -1,25 +1,24 @@
-/* eslint-disable camelcase */
+/* eslint-disable camelcase, key-spacing */
 const ffi = require('ffi');
-const struct = require('ref-struct');
+const structs = require('./structs');
+const {pointer, int32, ulonglong} = require('./types');
 const runtime = require('./runtime');
 const {coerceType} = require('./type-encodings');
 
-const __block_literal = struct({
-  isa: 'pointer',
-  flags: 'int32',
-  reserved: 'int32',
-  invoke: 'pointer',
-  descriptor: 'pointer'
+const _NSConcreteGlobalBlock = runtime.getSymbol('_NSConcreteGlobalBlock');
+
+const block_t = structs.defineStruct(null, {
+  isa:        pointer,
+  flags:      int32,
+  reserved:   int32,
+  invoke:     pointer,
+  descriptor: pointer
 });
 
-const __block_descriptor = struct({
-  reserved: 'ulonglong',
-  Block_size: 'ulonglong'
-});
-
-const descriptor = new __block_descriptor();
-descriptor.reserved = 0;
-descriptor.Block_size = __block_literal.size;
+const descriptor = structs.defineStruct(null, {
+  reserved:   ulonglong,
+  block_size: ulonglong
+}).new(0, block_t.size);
 
 class Block {
   constructor(fn, returnType, argumentTypes, skipBlockArgument = true) {
@@ -40,15 +39,13 @@ class Block {
   }
 
   makeBlock() {
-    const block = new __block_literal();
-
-    block.isa = runtime.getSymbol('_NSConcreteGlobalBlock');
-    block.flags = 1 << 29;
-    block.reserved = 0;
-    block.invoke = this.getFunctionPointer();
-    block.descriptor = descriptor.ref();
-
-    return block.ref();
+    return block_t.new(structs.CompoundInit, {
+      isa:        _NSConcreteGlobalBlock,
+      flags:      1 << 29,
+      reserved:   0,
+      invoke:     this.getFunctionPointer(),
+      descriptor: descriptor.ref()
+    }).ref();
   }
 
   getFunctionPointer() {

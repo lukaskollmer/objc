@@ -1,5 +1,6 @@
 const struct = require('ref-struct');
 
+const CompoundInit = Symbol('structs.CompoundInit');
 const structs = {};
 
 const createStructInitializer = (name, StructType) => {
@@ -12,27 +13,38 @@ const createStructInitializer = (name, StructType) => {
       return new StructType();
     }
 
-    if (fields.length !== args.length) {
-      throw new TypeError(`Invalid number of fields passed to '${name}' constructor. Expected ${fields.length}, got ${args.length}`);
+    const retval = new StructType();
+
+    if (args.length === 2 && args[0] === CompoundInit) {
+      for (const [key, value] of Object.entries(args[1])) {
+        retval[key] = value;
+      }
+    } else { // Array-like init
+      if (fields.length !== args.length) {
+        throw new TypeError(`Invalid number of fields passed to '${name}' constructor. Expected ${fields.length}, got ${args.length}`);
+      }
+      args.forEach((arg, index) => {
+        retval[fields[index]] = arg;
+      });
     }
 
-    const value = new StructType();
-    args.forEach((arg, index) => {
-      value[fields[index]] = arg;
-    });
-    return value;
+    return retval;
   };
 
   return StructType;
 };
 
 module.exports = {
+  CompoundInit,
+
   defineStruct: (name, fields) => {
     if (name in structs) {
       throw new Error(`Struct '${name}' is already defined`);
     }
     const type = struct(fields);
-    structs[name] = type;
+    if (name !== null) {
+      structs[name] = type;
+    }
     return createStructInitializer(name, type);
   },
 

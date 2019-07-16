@@ -250,6 +250,9 @@ module.exports = {
 
   coerceType: type => {
     if (typeof type === 'string') {
+      if (type === 'pointer') {
+        return ref.refType(ref.types.void);
+      }
       return parser.parse(type).toRefType();
     } else if (typeof type === 'object') {
       return type;
