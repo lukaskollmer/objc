@@ -8,6 +8,3 @@ node_js:
   - '9'
   - '10'
   - '11'
-
-after_script:
-  - 'cat coverage/lcov.info | ./node_modules/.bin/coveralls'
