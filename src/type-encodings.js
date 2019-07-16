@@ -48,7 +48,6 @@ class DataStructure {
   }
 
   toRefType() {
-    /* istanbul ignore next */
     throw new Error('should never reach here');
   }
 }
@@ -62,9 +61,7 @@ class DataStructurePrimitive extends DataStructure {
   toRefType() {
     const type = this.type === 'string' ? 'CString' : this.type;
     const refType = ref.types[type];
-    /* istanbul ignore else */
     if (refType) return refType; // eslint-disable-line curly
-    /* istanbul ignore next */
     throw new Error(`Unknown type ${type}`);
   }
 }

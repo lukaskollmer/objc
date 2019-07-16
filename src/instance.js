@@ -49,7 +49,6 @@ class Instance {
 
     const method = this.methodForSelector(selector);
 
-    /* istanbul ignore if */
     if (typeof method === 'undefined' || method.isNull()) {
       throw new Error(`Unable to find method ${selector.name} on object ${this.description()}`);
     }
@@ -103,7 +102,6 @@ class Instance {
     try {
       retval = msgSend(this.__ptr, selector.__ptr, ...args);
     } catch (err) {
-      /* istanbul ignore if */
       if (err instanceof Error) {
         throw err;
       }

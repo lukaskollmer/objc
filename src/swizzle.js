@@ -49,7 +49,6 @@ module.exports = (cls, selector, fn, type = 'instance') => {
     runtime.method_getTypeEncoding(originalMethod)
   );
 
-  /* istanbul ignore if */
   if (!success) {
     throw new Error(`Unable to add method '${selector}' to class ${runtime.class_getName(cls)}`);
   }
