@@ -1,3 +1,7 @@
+### v0.20.0 (2019-07-16)
+- Added a struct compound initializer (see block.js for a usage example)
+- Updated a bunch of outdated dependencies, removed some dependencies
+
 ### v0.19.0 (2019-01-01)
 - Updated the ffi module
 - Updated supported node versions to >=8
