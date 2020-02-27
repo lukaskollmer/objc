@@ -4,7 +4,7 @@
  * NOTE: This example doesn't work since the reply block will be called on a different thread
  */
 
-const ffi = require('ffi');
+const ffi = require('ffi-napi');
 const objc = require('../src/index.js');
 
 objc.import('LocalAuthentication');

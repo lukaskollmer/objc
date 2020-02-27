@@ -1,4 +1,4 @@
-const ref = require('ref');
+const ref = require('ref-napi');
 const runtime = require('./runtime');
 const Selector = require('./selector');
 const {InstanceProxy} = require('./proxies');

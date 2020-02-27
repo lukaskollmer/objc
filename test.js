@@ -913,7 +913,7 @@ test('[struct] struct as return type', t => {
 });
 
 test('[struct] struct defined in objc module works with ffi module', t => {
-  const ffi = require('ffi');
+  const ffi = require('ffi-napi');
   const libFoundation = new ffi.Library(null, {
     NSStringFromRange: ['pointer', [NSRange]]
   });

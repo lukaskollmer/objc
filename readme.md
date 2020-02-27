@@ -153,7 +153,7 @@ const substring = string.substringWithRange_(NSRange.new(0, 5));
 <summary><strong>Example 2**</strong> Using structs with the ffi module</summary>
 
 ```js
-const ffi = require('ffi');
+const ffi = require('ffi-napi');
 const CGFloat = objc.types.double;
 
 const CGPoint = objc.defineStruct('CGPoint', {

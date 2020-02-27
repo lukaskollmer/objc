@@ -1,4 +1,4 @@
-const ref = require('ref');
+const ref = require('ref-napi');
 const structs = require('./structs');
 
 const pointer = ref.refType(ref.types.void);
