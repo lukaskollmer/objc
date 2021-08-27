@@ -1,3 +1,8 @@
+### v0.21.0 (2021-08-27)
+- Switch to node-ffi-napi, ref-napi, and ref-struct-di
+- Remove exception support
+- Update node version requirements
+
 ### v0.20.0 (2019-07-16)
 - Added a struct compound initializer (see block.js for a usage example)
 - Updated a bunch of outdated dependencies, removed some dependencies
