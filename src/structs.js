@@ -1,4 +1,5 @@
-const struct = require('ref-struct');
+const ref = require('ref-napi')
+const struct = require('ref-struct-di')(ref);
 
 const CompoundInit = Symbol('structs.CompoundInit');
 const structs = {};

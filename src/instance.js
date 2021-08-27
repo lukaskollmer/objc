@@ -1,9 +1,10 @@
-const ref = require('ref');
+const ref = require('ref-napi');
 const runtime = require('./runtime');
 const Selector = require('./selector');
-const {InstanceProxy} = require('./proxies');
+const {InstanceProxy, _getUnderlyingObject} = require('./proxies');
 const Block = require('./block');
 const {coerceType} = require('./type-encodings');
+const util = require('util');
 
 let ns;
 const inoutType = ref.refType(ref.refType(ref.types.void));
@@ -99,13 +100,15 @@ class Instance {
 
     let retval;
 
+    // Doing the exception handling here is somewhat useless, since ffi-napi removed objc support
+    // (see https://github.com/node-ffi-napi/node-ffi-napi/issues/4 and https://github.com/node-ffi-napi/node-ffi-napi/commit/ee782d8510003fef67b181836bd089aae1e41f84)
+    // Keeping it in though in case they ever bring that back
     try {
       retval = msgSend(this.__ptr, selector.__ptr, ...args);
     } catch (err) {
       if (err instanceof Error) {
         throw err;
       }
-
       const exc = new InstanceProxy(new Instance(err));
       throw new Error(`${exc.name()} ${exc.reason()}`);
     }
@@ -133,6 +136,20 @@ class Instance {
       return '(null)';
     }
     return this.call('debugDescription').UTF8String(); // eslint-disable-line new-cap
+  }
+
+  toString() {
+    return this.description();
+  }
+
+  [util.inspect.custom](depth, options) {
+    const self = util.types.isProxy(this) ? this[_getUnderlyingObject] : this;
+    //return `[objc.Instance<${self.class()}> ${self.description()}]`;
+    return `[objc.Instance ${self.description()}]`;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'objc.Instance';
   }
 
   class() {

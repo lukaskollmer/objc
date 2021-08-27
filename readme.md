@@ -33,7 +33,6 @@ console.log(localizedDate); // -> "19. Apr 2017, 22:41:13"
 - [Calling Methods](#calling-methods)
 - [Blocks](#blocks)
 - [Constants](#constants)
-- [Exception Handling](#exception-handling)
 - [Structs](#structs)
 - [Inout Parameters](#inout-parameters)
 - [Method Swizzling](#method-swizzling)
@@ -121,20 +120,9 @@ console.log(NSFontAttributeName);   // => 'NSFont'
 
 `NSString*` constants are returned as native JavaScript `String` objects.
 
-### Exception handling
-The `objc` module automatically catches all exceptions thrown by Objective-C methods and rethrows them as JavaScript errors.
-
-Example:
-```js
-const {NSMutableArray} = objc;
-const array = NSMutableArray.array();
-
-array.addObject_(null);
-// -> throws 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil'
-```
 
 ### Structs
-Use the `objc.defineStruct` function to define a struct by its name and layout. The returned type can be used to create instances of the struct, and when specifying type encodings in the `objc` module. It is also compatible with the `ffi`, `ref`, `ref-struct` modules.
+Use the `objc.defineStruct` function to define a struct by its name and layout. The returned type can be used to create instances of the struct, and when specifying type encodings in the `objc` module. It is also compatible with the `ffi-napi`, `ref-napi`, `ref-struct-di` modules.
 
 You can use the `StructType.new` function to create an instance of the struct. Optionally, you can pass 
 
@@ -153,7 +141,7 @@ const substring = string.substringWithRange_(NSRange.new(0, 5));
 <summary><strong>Example 2**</strong> Using structs with the ffi module</summary>
 
 ```js
-const ffi = require('ffi');
+const ffi = require('ffi-napi');
 const CGFloat = objc.types.double;
 
 const CGPoint = objc.defineStruct('CGPoint', {

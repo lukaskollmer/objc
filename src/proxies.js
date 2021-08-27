@@ -1,9 +1,15 @@
 const util = require('util');
 const Selector = require('./selector');
 
+const _getUnderlyingObject = Symbol('getUnderlyingObject');
+
 const MethodProxy = (object, selector) => {
   const self = object;
-  return new Proxy(() => {}, {
+  const pseudoTarget = () => {};
+  pseudoTarget[util.inspect.custom] = (depth, options) => {
+    return `[objc.MethodProxy '${self.type === 'class' ? '+' : '-'}[${object.class()} ${selector}]']`
+  }
+  return new Proxy(pseudoTarget, {
     get: (_, key) => {
       if (key === util.inspect.custom) {
         return () => `[objc.MethodProxy '${self.type === 'class' ? '+' : '-'}[${object.class()} ${selector}]']`;
@@ -26,8 +32,11 @@ const MethodProxy = (object, selector) => {
 function InstanceProxy(object) {
   const self = object;
 
-  return new Proxy({}, {
-    get: (_, key) => {
+  return new Proxy(self, {
+    get: (target, key) => {
+      if (key === _getUnderlyingObject) {
+        return object;
+      }
       if (key === util.inspect.custom) {
         return () => `[objc.InstanceProxy ${self.description()}]`;
       } else if (key === Symbol.toPrimitive) {
@@ -84,5 +93,6 @@ function InstanceProxy(object) {
 
 module.exports = {
   InstanceProxy,
-  MethodProxy
+  MethodProxy,
+  _getUnderlyingObject
 };

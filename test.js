@@ -1,9 +1,8 @@
-import test from 'ava';
-
+const test = require('ava');
 const objc = require('./src/index');
 const util = require('util');
 
-const NULL_DESC = '[objc.InstanceProxy (null)]';
+const NULL_DESC = '[objc.Instance (null)]';
 
 // TODO
 // - test automatic conversion to String/Number using the constructor `Number(nsnumber_object)`
@@ -18,16 +17,19 @@ test('Load existent class', t => {
   });
 });
 
+
 test('Load non-existent class', t => {
   t.throws(() => {
     const {NSArrayy} = objc;
   });
 });
 
+
 test('class exists', t => {
   t.true(objc.runtime.classExists('NSString'));
   t.false(objc.runtime.classExists('ClassThatDoesntExist'));
 });
+
 
 /*
 Framework loading
@@ -51,7 +53,6 @@ Class metadata (not yet implemented)
 
 test.skip('Class class methods', t => {
   const NSString = objc.NSString;
-
   const classMethods = NSString.__classMethods;
 
   t.is(Array.isArray(classMethods), true);
@@ -66,9 +67,9 @@ test.skip('Class class methods', t => {
   t.true(classMethods.includes('stringEncodingForData:encodingOptions:convertedString:usedLossyConversion:'));
 });
 
+
 test.skip('Class instance methods', t => {
   const NSString = objc.NSString;
-
   const classMethods = NSString.__instanceMethods;
 
   t.is(Array.isArray(classMethods), true);
@@ -91,40 +92,35 @@ Object inspection
 
 test('description of class proxy', t => {
   const NSDate = objc.NSDate;
-
   const description = util.inspect(NSDate);
-
-  t.is(description, '[objc.InstanceProxy NSDate]');
+  t.is(description, '[objc.Instance NSDate]');
 });
+
 
 test('description of instance proxy', t => {
   const string = objc.NSString.stringWithString_('the north remembers');
-
   const description = util.inspect(string);
-
-  t.is(description, '[objc.InstanceProxy the north remembers]');
+  t.is(description, '[objc.Instance the north remembers]');
 });
+
 
 test('description of class method proxy', t => {
   const method = objc.NSDate.date;
-
   t.is(util.inspect(method), `[objc.MethodProxy '+[NSDate date]']`);
 });
 
+
 test('description of instance method proxy', t => {
   const obj = objc.NSObject.new()
-
   const method = obj.description;
-
   t.is(util.inspect(method), `[objc.MethodProxy '-[NSObject description]']`);
 });
+
 
 test('description of null proxy', t => {
   const obj = objc.allocRef();
   obj.__ptr = obj.__ptr.deref();
-
   const description = util.inspect(obj);
-
   t.is(description, NULL_DESC);
 });
 
@@ -139,13 +135,13 @@ test('string creation', t => {
   t.is(String(string), 'Hello World');
 });
 
+
 test('primitive argument types', t => {
   const NSNumber = objc.NSNumber;
-
   const number = NSNumber.numberWithInt_(5);
-
   t.is(number.intValue(), 5);
 });
+
 
 test('primitive return values', t => {
   const NSString = objc.NSString;
@@ -155,16 +151,16 @@ test('primitive return values', t => {
   t.is(typeof length, 'number');
 });
 
+
 test('Null return value', t => {
   const NSDictionary = objc.NSDictionary;
-
   const dict = NSDictionary.dictionary();
   t.is(null, dict.objectForKey_('key'));
 });
 
+
 test('Automatic array conversion (JS array -> NSArray)', t => {
   const NSArray = objc.NSArray;
-
   const inputArray = ['I', 'am', 'the', 'doctor'];
   const array = NSArray.arrayWithArray_(inputArray);
 
@@ -175,22 +171,23 @@ test('Automatic array conversion (JS array -> NSArray)', t => {
   });
 });
 
+
 test('convert NSNumber to Number', t => {
   const number = objc.ns(12);
-
   t.is(12, +number);
 });
 
-test('pass primitive w/out objc counterpart', t => {
-  const {NSMutableArray} = objc;
-  const array = NSMutableArray.array();
 
-  try {
-    array.addObject_(() => {});
-  } catch (err) {
-    t.is(err.message, 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil');
-  }
-});
+// test.skip('pass primitive w/out objc counterpart', t => {
+//   console.log('THIS SHOULD NOT BE RUNNING')
+//   const {NSMutableArray} = objc;
+//   const array = NSMutableArray.array();
+//   try {
+//     array.addObject_(() => {});
+//   } catch (err) {
+//     t.is(err.message, 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil');
+//   }
+// });
 
 
 /*
@@ -201,63 +198,56 @@ Explicit type conversion
 
 test('Type conversion JS -> ObjC: String', t => {
   const NSString = objc.NSString;
-
   const input = 'trust me. i am the doctor';
   const asNSString = objc.ns(input);
-
   t.true(asNSString.isKindOfClass_(NSString));
 });
 
+
 test('Type conversion ObjC -> JS: String', t => {
   const NSString = objc.NSString;
-
   const input = NSString.stringWithString_('trust me. i am the doctor');
   const asString = objc.js(input);
-
   t.is(asString, 'trust me. i am the doctor');
 });
+
 
 // Number
 
 test('Type conversion JS -> ObjC: Number', t => {
   const NSNumber = objc.NSNumber;
-
   const input = 42;
   const asNSNumber = objc.ns(input);
-
   t.true(asNSNumber.isKindOfClass_(NSNumber));
 });
 
+
 test('Type conversion ObjC -> JS: Number', t => {
   const NSNumber = objc.NSNumber;
-
   const input = NSNumber.numberWithInt_(42);
   const asNumber = objc.js(input);
-
   t.is(asNumber, 42);
 });
+
 
 // Array
 
 test('Type conversion JS -> ObjC: Array', t => {
   const NSArray = objc.NSArray;
-
   const input = ['time', 'and', 'relative', 'dimensions', 'in', 'space'];
   const asNSArray = objc.ns(input);
-
   t.true(asNSArray.isKindOfClass_(NSArray));
 });
 
+
 test('Type conversion ObjC -> JS: Array', t => {
   const NSArray = objc.NSArray;
-
   const items = ['time', 'and', 'relative', 'dimensions', 'in', 'space'];
-
   const input = NSArray.arrayWithArray_(items);
   const asArray = objc.js(input);
-
   t.deepEqual(items, asArray);
 });
+
 
 test('Type Conversion: JS Array containing objc objects -> NSArray', t => {
   const {NSArray, NSObject} = objc;
@@ -265,7 +255,6 @@ test('Type Conversion: JS Array containing objc objects -> NSArray', t => {
   const obj1 = NSObject.new();
   const obj2 = NSObject.new();
   const obj3 = NSObject.new();
-
 
   const input = [obj1, obj2, obj3];
   const asNSArray = objc.ns(input);
@@ -277,35 +266,36 @@ test('Type Conversion: JS Array containing objc objects -> NSArray', t => {
   t.true(asNSArray.objectAtIndex_(2).isEqual_(obj3));
 });
 
+
+
 // Date
 
 test('Type conversion JS -> ObjC: Date', t => {
   const NSDate = objc.NSDate;
-
   const input = new Date('1963-11-23T17:16:20');
   const asNSDate = objc.ns(input);
-
   t.true(asNSDate.isKindOfClass_(NSDate));
 });
 
+
 test('Type conversion ObjC -> JS: Date', t => {
   const NSDate = objc.NSDate;
-
   const input = NSDate.date();
   const asDate = objc.js(input);
-
   t.true(asDate instanceof Date);
 });
+
+
 
 // Object
 
 test('Type conversion JS -> ObjC: Object', t => {
   const input = {firstName: 'Lukas', lastName: 'Kollmer'};
   const objcValue = objc.ns(input);
-
   t.true(objcValue.objectForKey_('firstName').isEqualToString_('Lukas'))
   t.true(objcValue.objectForKey_('lastName').isEqualToString_('Kollmer'))
 });
+
 
 test('Type conversion ObjC -> JS: Object', t => {
   const {NSObject, NSString, NSMutableDictionary} = objc;
@@ -341,6 +331,8 @@ test('Type conversion ObjC -> JS: Object', t => {
   t.is(true, obj.isEqual_(me_js.obj));
 });
 
+
+
 // Selector
 
 test('[selector] create from string', t => {
@@ -348,34 +340,35 @@ test('[selector] create from string', t => {
   t.is(sel.name, 'allocWithCount:');
 });
 
+
 test('[selector] create from pointer', t => {
   const sel = new objc.Selector(objc.runtime.sel_getUid('newWithValue:'));
   t.is(sel.name, 'newWithValue:');
 })
 
+
 test('Type conversion JS -> ObjC: Selector', t => {
   const input = 'localizedDescriptionForRegion:completionHandler:';
   const sel = objc.ns(input, ':');
-
   t.is(true, sel instanceof objc.Selector)
   t.is(input, sel.name);
 });
+
+
 
 // Unknown
 
 test('Type conversion JS -> ObjC: Unknown', t => {
   const input = () => {};
   const objcValue = objc.ns(input);
-
   t.is(null, objcValue);
 });
 
+
 test('Type conversion ObjC -> JS: Unknown', t => {
   const NSProcessInfo = objc.NSProcessInfo;
-
   const input = NSProcessInfo.processInfo();
   const jsValue = objc.js(input);
-
   t.is(null, jsValue);
 });
 
@@ -388,13 +381,12 @@ Constants
 test('load constant', t => {
   objc.import('AppKit');
   const {NSFontAttributeName} = objc;
-
   t.is(NSFontAttributeName, 'NSFont');
 });
 
+
 test('load non-existent constant', t => {
   objc.import('AppKit');
-
   t.throws(() => {
     const {NSFontAttributeNamee} = objc;
   });
@@ -428,24 +420,25 @@ test('inout parameters 1 (^@)', t => {
   t.is(error2.code(), 4); // NSFileNoSuchFileError
 });
 
+
 test.skip('inout parameters 2 (^@)', t => {
   const {NSDictionary, NSAppleScript} = objc;
-
   const script = NSAppleScript.alloc().initWithSource_('telll application "Safari" to get URL of current tab of window 1');
-
   const error = objc.allocRef();
   const success = script.compileAndReturnError_(error);
-
   t.is(success, false);
   t.true(error.isKindOfClass_(NSDictionary));
 });
+
 
 test.skip('[inout parameters] `null` if not changed', t => {
   const {NSAppleScript} = objc;
 
   const script = NSAppleScript.alloc().initWithSource_(`tell application "System Events" to get name of current user`);
   const error = objc.allocRef();
+  console.log('will run script')
   script.executeAndReturnError_(error);
+  console.log('did run script')
 
   t.is(util.inspect(error), NULL_DESC);
   t.true(objc.isNull(error));
@@ -467,6 +460,7 @@ test('Test calling methods that contain underscores', t => {
   t.is(web_RFC1123DateString.isKindOfClass_('NSString'), true);
 });
 
+
 test('Trailing underscores in method names can be omitted', t => {
   const NSString = objc.NSString;
 
@@ -475,6 +469,7 @@ test('Trailing underscores in method names can be omitted', t => {
 
   t.is(String(str1), String(str2));
 });
+
 
 test('Test possible selectors for 0 underscores', t => {
   const Selector = require('./src/selector');
@@ -488,6 +483,7 @@ test('Test possible selectors for 0 underscores', t => {
   t.is(selectors.length, 0);
 });
 
+
 test('Test possible selectors for 1 underscore', t => {
   const Selector = require('./src/selector');
 
@@ -500,6 +496,7 @@ test('Test possible selectors for 1 underscore', t => {
     t.true(selectors.includes(permutation));
   }
 });
+
 
 test('Test possible selectors for 2 underscores', t => {
   const Selector = require('./src/selector');
@@ -515,6 +512,7 @@ test('Test possible selectors for 2 underscores', t => {
     t.true(selectors.includes(permutation));
   }
 });
+
 
 test('Test possible selectors for 3 underscores', t => {
   const Selector = require('./src/selector');
@@ -535,6 +533,7 @@ test('Test possible selectors for 3 underscores', t => {
   }
 });
 
+
 test('Test possible selectors for method with leading underscore and no other underscores', t => {
   const Selector = require('./src/selector');
 
@@ -547,6 +546,7 @@ test('Test possible selectors for method with leading underscore and no other un
     t.true(selectors.includes(permutation));
   }
 });
+
 
 test('Test possible selectors for method with leading underscore and other underscores', t => {
   const Selector = require('./src/selector');
@@ -567,7 +567,7 @@ test('Test possible selectors for method with leading underscore and other under
 /*
 Exception handling
 */
-test('ObjC exception handling', t => {
+test.skip('ObjC exception handling', t => {
   const NSMutableArray = objc.NSMutableArray;
 
   const array = NSMutableArray.array();
@@ -580,20 +580,20 @@ test('ObjC exception handling', t => {
   });
 });
 
-test('ObjC exception contains exception info', t => {
-  const NSMutableArray = objc.NSMutableArray;
 
-  const array = NSMutableArray.array();
-
-  array.addObject_('Hello');
-  array.addObject_('World');
-
-  try {
-    array.addObject_(null);
-  } catch (err) {
-    t.is(err.message, 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil');
-  }
-});
+// test.skip('ObjC exception contains exception info', t => {
+//   console.log('THIS SHOULD ALSO NOT BE RUNNING')
+//   const NSMutableArray = objc.NSMutableArray;
+//   const array = NSMutableArray.array();
+//   array.addObject_('Hello');
+//   array.addObject_('World');
+//   try {
+//     console.log('hmmm?')
+//     array.addObject_(null);
+//   } catch (err) {
+//     t.is(err.message, 'NSInvalidArgumentException *** -[__NSArrayM insertObject:atIndex:]: object cannot be nil');
+//   }
+// });
 
 
 /*
@@ -614,17 +614,20 @@ test('Blocks: Sort NSString* array by length, longest to shortest', t => {
   t.true(sortedArray.isEqualToArray_(['Doctor', 'The', 'Am', 'I']));
 });
 
+
 test('Blocks: objc.Block throws for missing block type encoding', t => {
   t.throws(() => {
     const block = new objc.Block(() => {});
   });
 });
 
+
 test('Blocks: objc.Block throws for incomplete block type encoding', t => {
   t.throws(() => {
     const block = new objc.Block(() => {}, 'v');
   });
 });
+
 
 test('Blocks: objc.Block passes for full block type encoding', t => {
   t.notThrows(() => {
@@ -651,6 +654,7 @@ test('Iterate over a NSArray', t => {
   t.is(inputArray.length, 0);
 });
 
+
 test('Iterate over a NSDictionary', t => {
   const {NSDictionary} = objc;
 
@@ -666,6 +670,7 @@ test('Iterate over a NSDictionary', t => {
   t.deepEqual({}, inputDict);
 });
 
+
 test('Iterate over a NSSet', t => {
   const {NSSet} = objc;
 
@@ -678,6 +683,7 @@ test('Iterate over a NSSet', t => {
   }
   t.is(items.length, 0);
 });
+
 
 test('Iterate over non-enumerable', t => {
   const {NSObject} = objc;
@@ -709,6 +715,7 @@ test('[method swizzling] swizzle class method', t => {
   restore();
 });
 
+
 test('[method swizzling] swizzle instance method (primitive return type)', t => {
   const {NSProcessInfo} = objc;
 
@@ -721,6 +728,7 @@ test('[method swizzling] swizzle instance method (primitive return type)', t => 
   restore();
 });
 
+
 test('[method swizzling] swizzle instance method (complex return type)', t => {
   const {NSObject} = objc;
 
@@ -732,6 +740,7 @@ test('[method swizzling] swizzle instance method (complex return type)', t => {
 
   restore();
 });
+
 
 test('[method swizzling] swizzle instance method with parameters', t => {
   const {NSDate, wrap} = objc;
@@ -749,6 +758,7 @@ test('[method swizzling] swizzle instance method with parameters', t => {
   restore();
 });
 
+
 test('[method swizzling] instance method: original implementation is still available', t => {
   // NSString is a class cluster, which is why we swizzle -[__NSCFString length] instead of `-[NSString length]`
   const restore = objc.swizzle('__NSCFString', 'length', () => {
@@ -761,6 +771,7 @@ test('[method swizzling] instance method: original implementation is still avail
 
   restore();
 });
+
 
 test('[method swizzling] class method: original implementation is still available', t => {
   const {NSProcessInfo, NSDate} = objc;
@@ -778,6 +789,7 @@ test('[method swizzling] class method: original implementation is still availabl
 
   restore();
 });
+
 
 test('[method swizzling] invalid parameters: method type', t => {
   t.throws(() => {
@@ -821,6 +833,7 @@ test('[custom class] instance methods', t => {
   t.is(null, obj.doesntReturnAnything());
 })
 
+
 test('[custom class] class methods', t => {
   const LKClass = objc.createClass('LKClass2', 'NSObject', {}, {
     'someClassMethodThatReturnsFourtyTwo': (self, cmd) => {
@@ -834,6 +847,7 @@ test('[custom class] class methods', t => {
 
     t.is(42, LKClass.someClassMethodThatReturnsFourtyTwo());
 })
+
 
 test('[custom class] no methods', t => {
   t.notThrows(() => {
@@ -855,6 +869,7 @@ test.skip('[struct] use not-yet defined struct', t => {
   });
 });
 
+
 test.skip('[struct] define struct', t => {
   t.notThrows(() => {
     NSRange = objc.defineStruct('_NSRange', {
@@ -869,6 +884,7 @@ test.skip('[struct] define struct', t => {
     objc.defineStruct('_NSRange', {});
   });
 });
+
 
 test('[struct] define/use existing struct', t => {
   t.throws(() => {
@@ -891,6 +907,7 @@ test('[struct] pass struct as parameter', t => {
   t.is('lo Wo', String(objc.ns('Hello World').substringWithRange_(range)));
 });
 
+
 test('[struct] pass field values in initializer', t => {
   const range = NSRange.new(8, 11);
   t.is(8, range.location);
@@ -899,11 +916,13 @@ test('[struct] pass field values in initializer', t => {
   t.is('pretty cool', String(objc.ns('This is pretty cool').substringWithRange_(range)));
 });
 
+
 test('[struct] call initializer with invalid arguments', t => {
   t.throws(() => {
     NSRange.new(1);
   });
 });
+
 
 test('[struct] struct as return type', t => {
   const string = objc.ns('Hello World');
@@ -912,8 +931,9 @@ test('[struct] struct as return type', t => {
   t.is(5, range.length);
 });
 
+
 test('[struct] struct defined in objc module works with ffi module', t => {
-  const ffi = require('ffi');
+  const ffi = require('ffi-napi');
   const libFoundation = new ffi.Library(null, {
     NSStringFromRange: ['pointer', [NSRange]]
   });
@@ -937,6 +957,7 @@ test('construct invalid Instance', t => {
     const obj = new objc.Instance(null);
   });
 });
+
 
 test('get username using NSProcessInfo, convert to javascript string and compare the value to the username given by `os.userInfo()`', t => {
   const NSProcessInfo = objc.NSProcessInfo;
@@ -965,6 +986,7 @@ const {
 
 const parser = new TypeEncodingParser();
 
+
 test('[type encoding parser] parse primitives', t => {
   for (const [key, value] of Object.entries(typeEncodingMappings)) {
     let expectedType;
@@ -977,6 +999,7 @@ test('[type encoding parser] parse primitives', t => {
     t.deepEqual(expectedType, parser.parse(key));
   }
 });
+
 
 test('[type encoding parser] parse array / struct / union / const attribute', t => {
   const voidPtrType = new DataStructurePointer(new DataStructurePrimitive('void'));
@@ -1031,6 +1054,7 @@ test('[type encoding parser] parse array / struct / union / const attribute', t 
     });
   }
 });
+
 
 test('[type encoding parser / coerceType] can use strings and type objects interchangeably', t => {
   t.is(coerceType('I'), coerceType(objc.types.uint32));

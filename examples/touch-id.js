@@ -4,7 +4,7 @@
  * NOTE: This example doesn't work since the reply block will be called on a different thread
  */
 
-const ffi = require('ffi');
+const ffi = require('ffi-napi');
 const objc = require('../src/index.js');
 
 objc.import('LocalAuthentication');
@@ -26,7 +26,8 @@ let sema = c.dispatch_semaphore_create(0);
 
 const handler = new objc.Block((success, err) => {
   console.log('handler');
-}, ['v', ['c', '@']]);
+  c.dispatch_semaphore_signal(sema);
+}, 'v', ['c', '@']);
 
 console.log(objc.NSThread.currentThread());
 context.evaluatePolicy_localizedReason_reply_(LAPolicyDeviceOwnerAuthenticationWithBiometrics, 'HEY', handler);
