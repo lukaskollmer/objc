@@ -1,3 +1,8 @@
+### v0.22.0 (2021-11-17)
+- Improve support for struct parameters in blocks
+- Improve support for inout (e.g. `BOOL*`) parameters in blocks
+- Fix a crash when printing a (proxied) instance of a class implementing neither `-description` nor `-debugDescription`
+
 ### v0.21.0 (2021-08-27)
 - Switch to node-ffi-napi, ref-napi, and ref-struct-di
 - Remove exception support
