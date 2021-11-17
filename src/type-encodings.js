@@ -254,6 +254,9 @@ module.exports = {
     } else if (typeof type === 'object') {
       return type;
     }
+    if (structs.isStructFn(type)) {
+      return type;
+    }
 
     throw new TypeError(`Unable to coerce type from ${type}`);
   }

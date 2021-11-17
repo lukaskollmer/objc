@@ -2,6 +2,7 @@ const ref = require('ref-napi')
 const struct = require('ref-struct-di')(ref);
 
 const CompoundInit = Symbol('structs.CompoundInit');
+const IsStructSymbol = Symbol();
 const structs = {};
 
 const createStructInitializer = (name, StructType) => {
@@ -31,7 +32,7 @@ const createStructInitializer = (name, StructType) => {
 
     return retval;
   };
-
+  StructType[IsStructSymbol] = true;
   return StructType;
 };
 
@@ -49,5 +50,7 @@ module.exports = {
     return createStructInitializer(name, type);
   },
 
-  getStructType: name => structs[name]
+  getStructType: name => structs[name],
+
+  isStructFn: obj => obj[IsStructSymbol] === true
 };

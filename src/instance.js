@@ -28,6 +28,9 @@ class Instance {
   }
 
   methodForSelector(selector) {
+    if (typeof selector === 'string') {
+      selector = new Selector(selector);
+    }
     if (this.type === 'class') {
       return runtime.class_getClassMethod(this.__ptr, selector.__ptr);
     }
@@ -135,7 +138,24 @@ class Instance {
     if (this.__ptr === null || this.__ptr.isNull()) {
       return '(null)';
     }
-    return this.call('debugDescription').UTF8String(); // eslint-disable-line new-cap
+    if (this.respondsToSelector('description')) {
+      return this.call('description').UTF8String(); // eslint-disable-line new-cap
+    } else if (this.respondsToSelector('debugDescription')) {
+      return this.call('debugDescription').UTF8String(); // eslint-disable-line new-cap
+    } else if (this.respondsToSelector('class')) {
+      let classname = runtime.class_getName(this.call('class'));
+      return `<${classname} ${this.__ptr}>`;
+    } else if (this.type === 'instance') {
+      let classname;
+      if (this.type === 'instance') {
+        classname = runtime.class_getName(runtime.object_getClass(this.__ptr));
+      } else {
+        classname = runtime.class_getName(this.__ptr);
+      }
+      return `<${classname} ${this.__ptr}>`;
+    } else {
+      return `objc.Instance(type: ${this.type}, __ptr: ${this.__ptr})`;
+    }
   }
 
   toString() {
@@ -157,6 +177,7 @@ class Instance {
   }
 
   static alloc() {
+    // TODO is this zero-initialised? (probably will otherwise try to fuck up rhe refcount, right?)
     return new InstanceProxy(new Instance(ref.alloc(inoutType)));
   }
 

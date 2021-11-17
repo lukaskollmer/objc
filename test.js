@@ -636,6 +636,52 @@ test('Blocks: objc.Block passes for full block type encoding', t => {
 });
 
 
+test('Blocks: Block w/ struct parameter and inout BOOL*', t => {
+  const ref = require('ref-napi');
+  objc.import('AppKit');
+  const { NSAttributedString, NSMutableAttributedString, NSLinkAttributeName } = objc;
+  const { id, NSRange } = objc.types;
+  let attrString = NSMutableAttributedString.new();
+  attrString.appendAttributedString_(NSAttributedString.alloc().initWithString_attributes_(
+    'abc', {
+      [NSLinkAttributeName]: 'https://example.com'
+    }
+  ));
+  attrString.appendAttributedString_(NSAttributedString.alloc().initWithString_attributes_(
+    'def', {
+      [NSLinkAttributeName]: 'https://example.de'
+    }
+  ));
+  attrString.appendAttributedString_(NSAttributedString.alloc().initWithString_attributes_(
+    'ghi', {
+      [NSLinkAttributeName]: 'https://example.net'
+    }
+  ));
+  t.is(attrString.description().UTF8String(), `abc{
+    NSLink = "https://example.com";
+}def{
+    NSLink = "https://example.de";
+}ghi{
+    NSLink = "https://example.net";
+}`);
+
+  let blockArgs = [];
+  let block = new objc.Block((arg0, arg1, arg2) => {
+    const attrs = objc.wrap(arg0);
+    const range = arg1;
+    blockArgs.push([objc.js(attrs), {location: range.location, length: range.length}]);
+    if (range.location === 3 && range.length === 3) {
+      ref.set(arg2, 0, 1); // uncomment this to have it stop iterating after the first range.
+    }
+    return;
+  }, objc.types.void, [id, NSRange, ref.refType(objc.types.char)]);
+  attrString.enumerateAttributesInRange_options_usingBlock_(NSRange.new(0, attrString.length()), 0, block);
+  t.deepEqual(blockArgs, [ // We expect the third pair to be missing, which tells us that stopping the iteration early by setting the *stop param worked.
+    [{NSLink: 'https://example.com'}, { location: 0, length: 3 }],
+    [{NSLink: 'https://example.de' }, { location: 3, length: 3 }]
+  ]);
+})
+
 /*
 Iterators
 */
