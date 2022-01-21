@@ -127,8 +127,10 @@ class Instance {
 
     if (returnTypeEncoding === '@') {
       return InstanceProxy(new Instance(retval)); // eslint-disable-line new-cap
-    } else if (returnTypeEncoding === 'c') {
-      // TODO This means that we can't return chars, which is bad. Find a solution to support both!
+    } else if (returnTypeEncoding === 'B') {
+      // This won't catch all booleans, since on x86_64 bools are encoded as 'c'
+      // (which we can't just flat-out all convert to Booleans),
+      // but C/C++ bools and ObjC BOOLs on ARM are encoded as 'B', so we should handle at least these properly...
       return Boolean(retval);
     }
     return retval;
