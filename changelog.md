@@ -1,3 +1,10 @@
+### v0.23.0 (2022-01-21)
+- Added a cache for parsed type encodings, which should result in somewhat better performance
+- `objc.import` now checks whether a bundle actually exists, and throws an error if it doesn't
+- `objc.import` now returns whether the bundle import was successful or not
+- Changed how `BOOL` and `char` return values are handled. On x86, `BOOL`s are now always returned as numbers (simple `if` checks should be unaffected by this), and on ARM they are returned as JS `Boolean`s
+
+
 ### v0.22.0 (2021-11-17)
 - Improve support for struct parameters in blocks
 - Improve support for inout (e.g. `BOOL*`) parameters in blocks
