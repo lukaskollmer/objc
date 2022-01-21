@@ -234,6 +234,7 @@ class TypeEncodingParser {
 }
 
 const parser = new TypeEncodingParser();
+const cachedParseResults = {};
 
 module.exports = {
   mapping: types,
@@ -250,7 +251,13 @@ module.exports = {
       if (type === 'pointer') {
         return ref.refType(ref.types.void);
       }
-      return parser.parse(type).toRefType();
+      let parseResult = cachedParseResults[type];
+      if (parseResult) {
+        return parseResult;
+      }
+      parseResult = parser.parse(type).toRefType();
+      cachedParseResults[type] = parseResult;
+      return parseResult;
     } else if (typeof type === 'object') {
       return type;
     }
