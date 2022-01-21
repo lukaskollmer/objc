@@ -22,7 +22,10 @@ const {
 module.exports.importFramework = name => {
   const path = name.includes('/') ? name : `/System/Library/Frameworks/${name}.framework`;
   const bundle = NSBundle.bundleWithPath_(path);
-  bundle.load();
+  if (!bundle) {
+    throw new Error(`Unable to find bundle named '${name}'`);
+  }
+  return bundle.load();
 };
 
 const js = module.exports.js = (object, returnInputIfUnableToConvert = false) => {
