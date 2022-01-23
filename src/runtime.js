@@ -13,10 +13,11 @@ const libobjc = new ffi.Library('libobjc', {
   sel_getName: ['string',  ['pointer']],
 
   // Classes
-  objc_getClass          : ['pointer', ['string' ]],
+  objc_getClass          : ['pointer', ['string' ]], // note: these are FFI type strings; e.g. objc_getClass returns `id`/'@'
   object_getClass        : ['pointer', ['pointer']],
   object_isClass         : ['bool',    ['pointer']],
-  class_getName          : ['string',  ['pointer']],
+  object_getClassName    : ['string',  ['pointer']],
+  class_getName          : ['string',  ['pointer']], // arg type here is `Class`/'#'
   class_getClassMethod   : ['pointer', ['pointer', 'pointer']],
   class_getInstanceMethod: ['pointer', ['pointer', 'pointer']],
   class_addMethod        : ['bool',    ['pointer', 'pointer', 'pointer', 'string']],
@@ -39,10 +40,8 @@ const libobjc = new ffi.Library('libobjc', {
 
 libobjc.objc_msgSend = ffi.DynamicLibrary().get('objc_msgSend'); // eslint-disable-line new-cap
 
-const msgSend = (returnType, argumentTypes) => {
-  return ffi.ForeignFunction(libobjc.objc_msgSend, returnType, argumentTypes); // eslint-disable-line new-cap
-};
 
+// TO DO: this is probably redundant: just ask for objc.CLASSNAME
 const classExists = classname => !libobjc.objc_getClass(classname).isNull();
 
 const getSymbol = name => new ffi.DynamicLibrary().get(name);
@@ -60,7 +59,6 @@ const getSymbolAsId = name => {
 dlfcn.dlopen('/System/Library/Frameworks/Foundation.framework/Foundation', ffi.DynamicLibrary.FLAGS.RTLD_LAZY);
 
 module.exports = libobjc;
-module.exports.msgSend = msgSend;
 module.exports.classExists = classExists;
 module.exports.getSymbol = getSymbol;
 module.exports.getSymbolAsId = getSymbolAsId;

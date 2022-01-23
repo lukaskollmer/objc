@@ -1,4 +1,8 @@
 /* eslint-disable camelcase, key-spacing */
+
+// wraps a JS function as an ObjC block so it can be called from ObjC // TO DO: there is some overlap between this and create-class.js, so perhaps opportunities to consolidate?
+
+const {__isObjCObject} = require('./constants');
 const ffi = require('ffi-napi');
 const structs = require('./structs');
 const {pointer, int32, ulonglong} = require('./types');
@@ -6,6 +10,9 @@ const runtime = require('./runtime');
 const {coerceType} = require('./type-encodings');
 
 const _NSConcreteGlobalBlock = runtime.getSymbol('_NSConcreteGlobalBlock');
+
+
+// an ObjC block
 
 const block_t = structs.defineStruct(null, {
   isa:        pointer,
@@ -19,6 +26,8 @@ const descriptor = structs.defineStruct(null, {
   reserved:   ulonglong,
   block_size: ulonglong
 }).new(0, block_t.size);
+
+
 
 class Block {
   constructor(fn, returnType, argumentTypes, skipBlockArgument = true) {
@@ -59,7 +68,7 @@ class Block {
       }
 
       // Return the return value, unwrapping potential instance proxies
-      if (retval !== null && retval.___is_instance_proxy === true) {
+      if (retval !== null && retval[__isObjCObject] === true) {
         return retval.__ptr;
       }
       return retval;

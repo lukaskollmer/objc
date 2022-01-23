@@ -12,7 +12,52 @@ const structs = require('./structs');
 //     a type object compatible with the `ffi`, `ref` and `ref-struct` modules
 //   - Currently, this is only supported for primitives, pointers and structs
 
-const types = {
+
+// TO DO: need to check ffi's documentation to see if it's fully extensible; however, it'd make a lot more sense for ALL argument and return value conversions to be handled in ffi.ForeignFunction, instead of in the method wrapper which currently reduces ObjCObjects, Selector, Block, etc in the method's arguments list to ffi's standard C types, and then ForeignFunction does a second pass of the arguments list marshalling those and any passed-thru JS arguments that our wrapper didn't convert for the eventual C function call (thus, for example, the method wrapper converts a JS string argument to a full ObjCInstance (NSString) and then pulls the __ptr out of that, which then gets runtime-checked again by ForeignFunction to see if it's a pointer; meantime the ObjCInstance wrapper that was created is immediately discarded again); whereas if we can create a custom encoder function for '@' (let's call it 'objc_object' in ffi parlance) that can be passed to ForeignFunction() where it does the whole conversion in one, in the shortest and most efficient way possible, while also reusing all of the existing architecture that ffi provides (which I expect provides some benefit over roll-your-own); also be worth comparing PyObjC to see if it has any useful insights on type bridging (although I think PyObjC uses Python's C APIs rather than an ffi library, so probably avoids a lot of what ffi does completely)
+
+
+/******************************************************************************/
+/* Objective-C type encodings
+
+https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html
+
+Code  Meaning
+
+  c   A char
+  i   An int
+  s   A short
+  l   A long (l is treated as a 32-bit quantity on 64-bit programs)
+  q   A long long
+  C   An unsigned char
+  I   An unsigned int
+  S   An unsigned short
+  L   An unsigned long
+  Q   An unsigned long long
+  f   A float
+  d   A double
+  
+  B   A C++ bool or a C99 _Bool
+  v   A void
+  
+  *   A character string (char *)
+  @   An object (whether statically typed or typed id)
+  #   A class object (Class)
+  :   A method selector (SEL)
+  
+  [array type]    An array
+  {name=type...}  A structure
+  (name=type...)  A union
+  bnum            A bit field of num bits
+  
+  ^type           A pointer to type
+  
+  ?   An unknown type (among other things, this code is used for function pointers)
+*/
+
+/******************************************************************************/
+
+
+const _objcToFFITypeEncodings = {
   'c': 'char',
   'i': 'int32',
   's': 'short',
@@ -161,9 +206,9 @@ class TypeEncodingParser {
           this.step();
           this.step();
           retval = new DataStructurePointer(new DataStructurePrimitive('void'));
-        } else if (types[this.currentToken]) {
+        } else if (_objcToFFITypeEncodings[this.currentToken]) {
           let type;
-          const primitiveType = types[this.currentToken];
+          const primitiveType = _objcToFFITypeEncodings[this.currentToken];
           if (primitiveType === 'pointer') {
             type = new DataStructurePointer(new DataStructurePrimitive('void'));
           } else {
@@ -234,10 +279,9 @@ class TypeEncodingParser {
 }
 
 const parser = new TypeEncodingParser();
-const cachedParseResults = {};
 
 module.exports = {
-  mapping: types,
+  mapping: _objcToFFITypeEncodings,
   TypeEncodingParser,
 
   DataStructurePrimitive,
@@ -246,25 +290,18 @@ module.exports = {
   DataStructureArray,
   DataStructureUnion,
 
-  coerceType: type => {
+  coerceType: type => { // this seems like it wants to extend ffi-ref's coerceType() to handle ObjC types as well; however, it doesn't appear to call coerceType to handle and, more problematically, is throwing away ObjC-specific type information which could be used in ffi.ForeignFunction instead of having one step for mapping ObjC-specific types (in the method wrapper) and another step (ForeignFunction) for mapping C types
     if (typeof type === 'string') {
       if (type === 'pointer') {
         return ref.refType(ref.types.void);
+      } else {
+        return parser.parse(type).toRefType();
       }
-      let parseResult = cachedParseResults[type];
-      if (parseResult) {
-        return parseResult;
-      }
-      parseResult = parser.parse(type).toRefType();
-      cachedParseResults[type] = parseResult;
-      return parseResult;
     } else if (typeof type === 'object') {
       return type;
-    }
-    if (structs.isStructFn(type)) {
+    } else if (structs.isStructFn(type)) {
       return type;
     }
-
     throw new TypeError(`Unable to coerce type from ${type}`);
   }
 };
