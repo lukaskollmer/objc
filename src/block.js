@@ -2,7 +2,7 @@
 
 // wraps a JS function as an ObjC block so it can be called from ObjC // TO DO: there is some overlap between this and create-class.js, so perhaps opportunities to consolidate?
 
-const {__isObjCObject} = require('./constants');
+const constants = require('./constants');
 const ffi = require('ffi-napi');
 const structs = require('./structs');
 const {pointer, int32, ulonglong} = require('./types');
@@ -62,16 +62,15 @@ class Block {
     const callback = ffi.Callback(this.returnType, this.argumentTypes, function () { // eslint-disable-line new-cap
       // Call the block implementation, skipping the 1st parameter (the block itself)
       const retval = self.fn.apply(null, Array.from(arguments).slice(self.skipBlockArgument ? 1 : 0));
-
-      if (retval === undefined) {
+      
+      // seems like another case of - let's add our own ObjC-specific codecs to ffi.ref's, and let Callback's returnType make the appropriate conversions
+      if (retval === undefined || retval === null) { // in this case, if callback function [carelessly] returns an `undefined` result, we can treat that as equivalent to returning null, either of which ObjC can treat as a `nil`
         return null;
+      } else {
+        // Return the return value, unwrapping potential instance proxies
+        let obj = retval[constants.__objcObject];
+        return obj === undefined ? retval : obj.__ptr;
       }
-
-      // Return the return value, unwrapping potential instance proxies
-      if (retval !== null && retval[__isObjCObject] === true) {
-        return retval.__ptr;
-      }
-      return retval;
     });
 
     return callback;

@@ -7,6 +7,7 @@ const createClass = require('./create-class'); // for subclassing ObjC classes i
 const {js, ns} = require('./type-converters');
 const {defineStruct} = require('./structs');
 const types = require('./types');
+const {InOutRef} = require('./inout.js');
 
 
 
@@ -28,6 +29,8 @@ module.exports = new Proxy({
   types,
   runtime, // TO DO: what needs to be publicly exported from ./runtime.js? (which is mostly libobjc, and arguably not something client code should need access to: if they do need some feature, it should probably be exposed as a public API)
   Block,
+  ObjCObject: instance.ObjCObject, // exported for debugging; we really want to keep it internal though
+  InOutRef,
   Selector,
   swizzle,
   createClass,
@@ -42,10 +45,14 @@ module.exports = new Proxy({
 //  isNull: Instance.isNull // TO DO: 
 }, {
   get: (builtins, key) => {
-  
+    
+//    console.log("$$$" + Object.prototype.hasOwnProperty.call(builtins, key) + '   "' +String(key) + '" = '+ typeof builtins[key])
+    
     if (Object.prototype.hasOwnProperty.call(builtins, key)) { // TO DO: curious why? there shouldn't be anything on builtins object, or is this to guard against any JS runtime shenannigans, injecting crud where it shouldn't be?
       return builtins[key];
     }
+    
+    // OK, so there's a risk in principle of builtin names masking importable names; do we really need to worry about that in practice though, given that [Obj]C strongly encourages framework devs to prefix all exported names with an ad-hoc namespace (e.g. "NSBlock", not, "Block")? if name masking is a concern, we could use `$NAME` to disambiguate imported names; stripping the leading '$' when doing the actual lookup
     
  // console.log("GET: "+key);
   
@@ -56,17 +63,26 @@ module.exports = new Proxy({
       const ptr = runtime.getSymbolAsId(key);
       if (ptr !== null) {
       
-        console.log(`creating symbol: ${runtime.object_getClassName(ptr)}`);
-      
+      // TO DO: why is NSString constant found but NSUInteger constant not? (I’m assuming that string constants, being objects, have to be exported by the object file; whereas numeric C constants are normally defined in .h only so their names don't appear in symbol table); this doesn't preclude the possibility of non-NSString constants appearing in symbol table (e.g. CString, NSNumber), so automatically assuming that a constant is an NSString, or even an ObjC object, would be unwise; for now though, we'll assume it's some sort of NSObject, and if user tries to import any other symbol (e.g. C function) we can't really prevent that (and it will most likely crash); the eventual solution is to use bridgesupport or maybe PyObjC’s header parser to generate tables of all non-ObjC symbols (parsing headers would also allow exact argument types for all methods to be determined—in theory introspection could provide '@<classname>', but in practice is normally just '@', and chances are those parsed tables could be used to construct method wrappers more quickly than introspection does, so pregenerated glues could use those and leave introspection as fallback when a glue isn't available) (of note: importing PyObjC glue modules, e.g. `import Foundation`, is surprisingly laggy (1–2 sec); wonder if that's because it generates a full set of class and method wrappers at import time, rather than generating them individually as and when needed?)
         
-        // wrap: obj => new InstanceProxy(new Instance(obj)),
-        //obj = new builtins.ObjCInstance(instance.getClassByName('NSString', ptr)).UTF8String(); // TO DO: this seems to assume that [introspectable] constants will always be NSStrings, which is a standard convention in Cocoa (e.g. `NSHumanReadableCopyright`, used in NSBundle's infoDictionary), but not guaranteed (e.g. what about NSUTF8StringEncoding?); also, what about C funcs and other exported names? won't getSymbolAsId() return those too (e.g. a C func would also appear as a pointer, but will go very wrong if wrapped as something else)
-        // also, why call UTF8String() to convert back to JS string? the only reason to get these keys is to use them in ObjC APIs, so converting to JS strings is creating extra work; the main gotcha is when using NSStrings as JS object keys, but that can be addressed by having toString()/toPrimitive() return -UTF8String instead of -description when the ObjC object isKindOfClass:NSString (note that -[NSString description] already does this, returning NSString's actual value instead of descriptive representation as is case for e.g. -[NSArray description] and others, so all we're doing is avoiding the "[ObjCInstance CLASS DESCRIPTION]" JS-style description string that will be generated for most NS classes)
+        //console.log(objc.NSAppleScriptErrorAppName)
+        //console.log(objc.NSUTF8StringEncoding)
+
+        //console.log(objc.runtime.getSymbol('NSAppleScriptErrorAppName'))
+        //console.log(objc.runtime.getSymbol('NSUTF8StringEncoding'))
+
+      
+        //console.log(`creating symbol: ${runtime.object_getClassName(ptr)}`);
+        
+        obj = instance.getClassByName(runtime.object_getClassName(ptr));
+        builtins[key] = obj;
+        
+        // originally: obj = (new InstanceProxy(new Instance(ptr))).UTF8String(); // TO DO: why call UTF8String() to convert back to JS string? the only reason to get these keys is to use them in ObjC APIs, so converting to JS strings is creating extra work; the main gotcha is when using NSStrings as JS object keys, but that can be addressed by having toString()/toPrimitive() return -UTF8String instead of -description when the ObjC object isKindOfClass:NSString (note that -[NSString description] already does this, returning NSString's actual value instead of descriptive representation as is case for e.g. -[NSArray description] and others, so all we're doing is avoiding the "[ObjCInstance CLASS DESCRIPTION]" JS-style description string that will be generated for most NS classes) // for now, let's leave the value as an ObjC instance
     
       } else {
         // TO DO: should this return undefined (the standard JS behavior) or throw (more foolproof)?
         // return undefined; 
-        throw new Error(`Unable to find symbol '${key}'`);
+        throw new Error(`Unable to find 'objc.${key}'`);
     
       }
     }
@@ -76,6 +92,6 @@ module.exports = new Proxy({
   },
   
   set: (_, key, value) => {
-    throw new Error(`Cannot set objc.${key}`);
+    throw new Error(`Cannot set 'objc.${key}'`);
   }
 });

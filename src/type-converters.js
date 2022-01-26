@@ -7,7 +7,7 @@
 // TO DO: once the behavior of ns() and js() is finalized, performance optimize them as much as possible as converting to and from standard JS types will be a significant bottleneck; e.g. bypass ./instance.js's high-level wrappers and use the ffi APIs directly, (since there's only a half-dozen JS types to bridge, it's worth the extra coding); much of the safety checks that are performed when user calls arbitrary methods with arbitrary arguments can be skipped; as well as bypassing at least some of ./instance.js's class and method wrappers (with their associated overheads, particularly when packing/unpacking arrays and dictionaries), it might even be possible to skip some of the ObjC dynamic dispatch (objc_msgSend itself is very fast, but our wrapper code around it adds its own non-trivial overhead) and assign the classes and methods' underlying C pointers to consts and use those directly with FFI APIs
 
 
-const {__isObjCObject} = require('./constants');
+const constants = require('./constants');
 const Selector = require('./selector');
 
 
@@ -29,16 +29,24 @@ const getClass = classname => {
 
 // note: these don't map Booleans (although bools represented as NSNumber aren't often encountered, they are a possibility, e.g. an NSDictionary which contains @YES/@NO values)
 
-const js = (object, returnInputIfUnableToConvert = false) => { // TO DO: recommend making the default true, i.e. if object can't be converted to a standard JS type then return it as-is (all ObjCObjects are still JS objects) // TO DO: should there be an additional option for shallow vs deep unpacks? currently js(object,false) only guarantees shallow unpacking, as items within the resulting JS Array/object can still be ObjC objects
+const js = (object, returnInputIfUnableToConvert = false) => { // TO DO: recommend making the default behavior to return object as-is if it isn't converted (i.e. all ObjCObjects are still JS objects, so technically correct; the only reason for forcing conversion is when passing the returned value to a standard JS function, e.g. JSON.stringify, which won't understand objc objects); maybe rename to `isStrict`/`mustConvert` and reverse the boolean? // TO DO: should there be an additional `recursive` option for shallow vs deep unpacks? currently js(object,false) only guarantees shallow unpacking, as items within the resulting JS Array/object can still be ObjC objects; having 2 independent flags (loose/strict and shallow/deep) should cover pretty much all use-cases (Q. should defaults be loose+shallow or loose+deep? user probably usually wants a deep unpack, so consider making that the default)
   let retvalue;
   
 //let t = process.hrtime.bigint();
   
-  if (object.isKindOfClass_(getClass('NSString'))) {
+  // everything that isn't an ObjCClass/ObjCInstance gets passed straight thru (although it is irritating that undefined and null throw when you try to look up attributes on them, hence the extra tests); TO DO: should js() reject `undefined` argument as a type error?
+  if (object === undefined || object === null || object[constants.__objcObject] === undefined) {
+    retvalue = object;
+  
+  // TO DO: this could be streamlined by getting __objcInstancePtr and passing its ptr directly to prebuilt ForeignFunction (although, TBF, once method wrappers are fully streamlined there might be very little difference)
+  } else if (object.isKindOfClass_(getClass('NSString'))) {
     retvalue = object.UTF8String(); // eslint-disable-line new-cap
   
+//  } else if (object.isKindOfClass_(getClass('__NSCFBoolean'))) { // TO DO: see below
+//    retvalue = object.boolValue();
+  
   } else if (object.isKindOfClass_(getClass('NSNumber'))) {
-    // TO DO: what about booleans? problem here is 'c' type and __NSCFBoolean
+    // TO DO: what about booleans? problem here is NSNumber.objCType is 'c' for both chars and bools, so to determine which it really is requires examining its true (private) class (NSNumber being a class cluster), which is __NSCFBoolean for a boolean; Q. does 'isKindOfClass:NSNumber' return true when value is any member of the NSNumber class cluster?
     retvalue = object.doubleValue();
   
   } else if (object.isKindOfClass_(getClass('NSDate'))) {
@@ -73,8 +81,11 @@ const ns = (object) => {
   let retvalue;
   
 //let t = process.hrtime.bigint();
+
+  if (object === undefined) {
+    throw new Error('objc.ns() expected a value but received undefined.'); // should really be a type error
   
-  if (object === null || object === undefined || object[__isObjCObject]) { // TO DO: should `undefined` be treated as an argument type error?
+  } else if (object === null || object[constants.__objcObject] !== undefined) { // only issue with this is that it allows an ObjCClass to pass thru, whereas objc.ns() should maybe guarantee always to return an ObjCInstance (since passing a `Class` where an `id` is expected probably isn't what ObjC APIs want to deal with); that said, `NSArray.arrayWithObject_(NSString)` works in PyObjC, so if ObjC seems willing to treat an ObjC class as `id` then who are we to argue?
     retvalue = object;
     
   } else if (typeof object === 'string' || object instanceof String) { // String -> NSString
@@ -106,7 +117,7 @@ const ns = (object) => {
     // note: PyObjC seems to treat NSNumber.numberWithBool_ calls as a special case, as it returns a native True/False rather than, say, a <class 'objc.pyobjc_bool'> (I suspect that since a bool->NSNumber conversion is inherently cheap, PyObjC just leaves it until it's packing the arguments for objc_msgSend)
     
   } else {
-    // Return null if there's no objc counterpart for the js type // TO DO: shouldn't this throw? (alternatively, it might be possible to wrap JS-only values in an opaque NSValue, allowing them to pass through ObjC APIs unchanged, although there are probably issues there with JS's GC not knowing the value is non-collectable)
+    // Return null if there's no objc counterpart for the js type // TO DO: shouldn't this throw? (alternatively, it might be possible to wrap JS-only values in an opaque NSValue, allowing them to pass through ObjC APIs unchanged, although there are probably issues there with JS's GC not knowing the value is non-collectable; to answer this question: list any JS types that won't be handled by one of the above cases)
     retvalue = null;
   }
   

@@ -26,6 +26,7 @@ const libobjc = new ffi.Library('libobjc', {
   objc_registerClassPair : ['void',    ['pointer']],
 
   // Methods
+  method_getTypeEncoding        : ['string',  ['pointer']],
   method_getImplementation      : ['pointer', ['pointer']],
   method_getTypeEncoding        : ['string',  ['pointer']],
   method_copyReturnType         : ['string',  ['pointer']],
