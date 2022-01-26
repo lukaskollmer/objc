@@ -7,7 +7,7 @@ const objc = require('objc')
 
 let code = "<invalid AppleScript code>"
 
-code = "2 + 2"
+//code = "2 + 2"
 
 let scpt = objc.NSAppleScript.alloc().initWithSource_(code)
 
