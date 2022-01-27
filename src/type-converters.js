@@ -88,7 +88,7 @@ const ns = (object) => {
   } else if (object === null || object[constants.__objcObject] !== undefined) { // only issue with this is that it allows an ObjCClass to pass thru, whereas objc.ns() should maybe guarantee always to return an ObjCInstance (since passing a `Class` where an `id` is expected probably isn't what ObjC APIs want to deal with); that said, `NSArray.arrayWithObject_(NSString)` works in PyObjC, so if ObjC seems willing to treat an ObjC class as `id` then who are we to argue?
     retvalue = object;
     
-  } else if (typeof object === 'string' || object instanceof String) { // String -> NSString
+  } else if (constants.isString(object)) { // String -> NSString
     // note: ns() supports the common use-case, which is converting a JS string to an NSString instance
     // to get a Class instead, use `objc[object]`; to get a Selector use `selectorForMethodName(object)`
     retvalue = getClass('NSString').stringWithUTF8String_(object);

@@ -29,5 +29,7 @@ Error: BUG: ObjCClass[Symbol.toPrimitive] thinks 'this' is a method Proxy, not i
 
 */
 
+//objc.NSString.blahBlah
+
 console.log('test class: '+objc.NSString) // "test class: [ObjCClass NSString]"
 

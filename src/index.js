@@ -1,13 +1,14 @@
+// objc
+
+const types = require('./types');
 const runtime = require('./runtime');
 const instance = require('./instance');
+const {js, ns} = require('./type-converters');
+const {InOutRef} = require('./inout.js');
 const Block = require('./block');
 const Selector = require('./selector');
-const swizzle = require('./swizzle'); // Q. what's being swizzled?
 const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
-const {js, ns} = require('./type-converters');
 const {defineStruct} = require('./structs');
-const types = require('./types');
-const {InOutRef} = require('./inout.js');
 
 
 
@@ -20,29 +21,43 @@ const importFramework = name => {
   if (!bundle) {
     throw new Error(`Unable to find bundle named '${name}'`);
   }
-  return bundle.load();
+  if (!bundle.load()) { // TO DO: it would be better to use loadAndReturnError:(NSError**), to provide better error messages
+    throw new Error(`Unable to load bundle named '${name}'`);
+  }
+  return bundle; // TO DO: confirm this; we probably should return the bundle itself, in case callers want to load nib or other resource files as well
 };
 
 
 
 module.exports = new Proxy({
-  types,
-  runtime, // TO DO: what needs to be publicly exported from ./runtime.js? (which is mostly libobjc, and arguably not something client code should need access to: if they do need some feature, it should probably be exposed as a public API)
-  Block,
-  ObjCObject: instance.ObjCObject, // exported for debugging; we really want to keep it internal though
-  InOutRef,
-  Selector,
-  swizzle,
-  createClass,
-  import: importFramework,
+  // import frameworks
+  import: importFramework, // TO DO: is it worth allowing multiple frameworks to be imported in a single `import()`, as a convenience to users? e.g.: objc.import('AppKit', 'CoreData', 'WebKit')
+  // explicitly convert values between ObjC and JS types
   js,
   ns,
+  
+  // type checking (note: users should use these functions to identify ObjC objects rather than e.g. `object instanceof objc.__internal__.ObjCInstance`, unless they really understand what they're doing)
   isClass: instance.isWrappedObjCClass,
   isInstance: instance.isWrappedObjCInstance,
-  defineStruct,
-//  wrap: obj => new InstanceProxy(new Instance(obj)),
-//  allocRef: Instance.alloc, // TO DO: used for inout arguments; problem is, we don't know for sure what class of out value will be; maybe we want an explicit InOutRef; we also want to avoid setting __ptr on existing ObjCInstances, which is probably how it's currently done
-//  isNull: Instance.isNull // TO DO: 
+  
+  // creating ObjC-specific types
+  types,
+  Block,
+  InOutRef,
+  Selector,
+  
+  
+  NSRange: defineStruct('_NSRange', { // TO DO: check this (Q. why is struct name prefixed?)
+    location: types.NSUInteger,
+    length: types.NSUInteger
+  }), 
+  
+  
+  defineStruct, // TO DO: how/where should type constructors be presented? e.g. createClass, defineStruct, and Block will all need objc.types; also, their names and instantiation processes are all inconsistent
+  
+  createClass, // TBD
+  
+  __internal__: instance, // allow access to internal APIs, should users need to work directly with ObjC pointers (e.g. when passing NS objects to/from CF APIs and vice-versa); caution: here be dragons
 }, {
   get: (builtins, key) => {
     

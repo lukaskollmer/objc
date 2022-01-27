@@ -28,7 +28,7 @@ let res = scpt.compileAndReturnError_(errorRef)
 
 error = errorRef.deref()
 
-console.log("error="+typeof error + '  ' + error instanceof objc.ObjCObject)
+console.log("error="+typeof error + '  ' + error instanceof objc.__internal__.ObjCObject)
 if (error) { error = error.description().UTF8String() }
 
 console.log("compileAndReturnError: success=" + res + '  err=' + error)
