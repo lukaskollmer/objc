@@ -105,56 +105,97 @@ function introspectMethod(object, methodName) {
   
   // TO DO: Q. how are varargs represented? e.g. +[NSString stringWithFormat:…]
   
-//console.log("bindMethod: `"+object+'` '+typeof methodName+'  "'+String( methodName)+'"');
+//console.log("`"+object+'` '+typeof methodName+'  "'+String( methodName)+'"');
   
+  // sanity checks; TO DO: get rid of these once satisfied callers always pass correct argument types
   if (!object instanceof ObjCObject || object[constants.__objcObject]) {
     throw new Error(`introspectMethod expected unwrapped ObjCObject but received ${typeof object}: '${String(object)}'`);
   }
   if (!(typeof methodName === 'string' || methodName instanceof String)) {
     throw new Error(`introspectMethod expected string name but received ${typeof methodName}: '${String(methodName)}'`);
   }
-  
 
   let selector = Selector.fromjs(methodName);
-  
-  // look up the method so we can introspect its argument and return types
-  const method = object.objcMethodPtr(selector);
-  
-//  console.log(`introspecting '${object.rawDescription()}.${methodName}' found=${method && !method.isNull()}`)
-  if (method === undefined || method.isNull()) { // TO DO: when does objcMethodPtr return undefined as opposed to NULL ptr?
+    // look up the method so we can introspect its argument and return types
+    const method = object.objcMethodPtr(selector);
   
   
-    throw new Error(`No method named '${selector.name}' on object: ${object.rawDescription()}`);
-  }
+  /* 
+    TO DO: what does number after each type mean? (does PyObjC source know?) e.g.:
   
-  // TO DO: would method_getTypeEncoding() be faster than using method_copyReturnType and method_copyArgumentType?
-       
-  const returnTypeEncoding = runtime.method_copyReturnType(method);
-  const returnType = coerceType(returnTypeEncoding); // get ffi type // TO DO: coerceType() discards ObjC-specific mapping info and treats all ObjC types as C types, necessitating an extra layer of type conversion code in the method wrapper below before it calls msgSend; whereas if we can pass ObjC-aware codecs to ffi.ForeignFunction(…) below, the method wrapper can call msgSend directly, simplifying this code and (hopefully) speeding up argument and return value conversions (currently the biggest performance bottleneck now that method lookups are cached)
-  
-  // this count includes the first 2 arguments (object and selector) to every ObjC method call
-  const argc = runtime.method_getNumberOfArguments(method);
+      bindMethod: [ObjCClass NSBundle] "bundleWithPath:" "@24@0:8@16"
+        return type {$i} '@
+        argument 0 "@"
+        argument 1 ":"
+        argument 2 "@"
+      
+    TO DO: what about unknown characters? e.g.:
     
-  const argumentTypeEncodings = []; // Array of ObjC type encoding strings: 2 implicit arguments (object and selector, which always have the same type BTW so we could probably skip looking those up here and just hardcode them in these arrays), and 0+ additional arguments to be explicitly passed by caller
-  const argumentTypes = []; // ffi
-  for (let i = 0; i < argc; i++) {
-    let enc = runtime.method_copyArgumentType(method, i); // punishingly slow
-    argumentTypeEncodings.push(enc);
-    argumentTypes.push(coerceType(enc)); // TO DO: ditto coerceType()
+      bindMethod: [ObjCInstance NSURL] "getResourceValue:forKey:error:" "c40@0:8o^@16@24o^@32"
+        return type {$i} 'c
+        argument 0 "@"
+        argument 1 ":"
+        argument 2 "o^@"
+
+      Error: [ObjCInstance NSURL] 'getResourceValue_forKey_error_' ('c40@0:8o^@16@24o^@32') Error: argument 2 "o^@" Error: Unexpected token 'o'
+
+      
+  */
+  
+  console.log(`\nbindMethod: ${object} "${selector.name}" "${runtime.method_getTypeEncoding(method)}"`);
+  
+  try {
+
+  
+  
+  //  console.log(`introspecting '${object.rawDescription()}.${methodName}' found=${method && !method.isNull()}`)
+    if (method === undefined || method.isNull()) { // TO DO: when does objcMethodPtr return undefined as opposed to NULL ptr?
+  
+  
+      throw new Error(`No method named '${selector.name}' on object: ${object.rawDescription()}`);
+    }
+  
+    // TO DO: would method_getTypeEncoding() be faster than using method_copyReturnType and method_copyArgumentType?
+       
+    const returnTypeEncoding = runtime.method_copyReturnType(method);
+    console.log(`  return type {$i} '${returnTypeEncoding}`);
+    
+    const returnType = coerceType(returnTypeEncoding); // get ffi type // TO DO: coerceType() discards ObjC-specific mapping info and treats all ObjC types as C types, necessitating an extra layer of type conversion code in the method wrapper below before it calls msgSend; whereas if we can pass ObjC-aware codecs to ffi.ForeignFunction(…) below, the method wrapper can call msgSend directly, simplifying this code and (hopefully) speeding up argument and return value conversions (currently the biggest performance bottleneck now that method lookups are cached)
+  
+    // this count includes the first 2 arguments (object and selector) to every ObjC method call
+    const argc = runtime.method_getNumberOfArguments(method);
+    
+    const argumentTypeEncodings = []; // Array of ObjC type encoding strings: 2 implicit arguments (object and selector, which always have the same type BTW so we could probably skip looking those up here and just hardcode them in these arrays), and 0+ additional arguments to be explicitly passed by caller
+    const argumentTypes = []; // ffi
+    for (let i = 0; i < argc; i++) {
+      let enc = runtime.method_copyArgumentType(method, i); // punishingly slow
+      console.log(`  argument ${i} "${enc}"`);
+      argumentTypeEncodings.push(enc);
+      try {
+        argumentTypes.push(coerceType(enc)); // TO DO: ditto coerceType()
+      } catch (e) {
+        e.message = `argument ${i} "${enc}" ${e}`;
+        throw e;
+      }
+    }
+  
+    // this msgSend function takes object and selector and additional arguments supplied by client code, as ffi objects; 
+    // TO DO: what does using ffi.ForeignFunction give us over invoking objc_msgSend directly? (I’m guessing the obvious answer is “guards against blowing up if caller passes the wrong argument types”, although since we already have to do runtime type checking and conversion ourselves that might be an unnecessary duplication of effort)
+    const msgSend = ffi.ForeignFunction(runtime.objc_msgSend, returnType, argumentTypes); // eslint-disable-line new-cap
+  
+    // note: the returned object does NOT include the method pointer: objc_msgSend() will do its own (dynamic ObjC) method dispatch every time this method is called on a given object; we do, however, assume that whatever method implementation appears on a given object, it will always have the exact same signature as the one we originally introspected (which should be a safe assumption as changing an argument type from e.g. ^@ to i or a return type from @ to void would be a Very Bad Idea all round)
+    return {
+      selector,
+      argc,
+      argumentTypes: argumentTypeEncodings,
+      returnType: returnTypeEncoding,
+      msgSend
+    };
+  
+  } catch (e) {
+    e.message = `${object} '${methodName}' ('${runtime.method_getTypeEncoding(method)}') ${e}`;
+    throw e;
   }
-  
-  // this msgSend function takes object and selector and additional arguments supplied by client code, as ffi objects; 
-  // TO DO: what does using ffi.ForeignFunction give us over invoking objc_msgSend directly? (I’m guessing the obvious answer is “guards against blowing up if caller passes the wrong argument types”, although since we already have to do runtime type checking and conversion ourselves that might be an unnecessary duplication of effort)
-  const msgSend = ffi.ForeignFunction(runtime.objc_msgSend, returnType, argumentTypes); // eslint-disable-line new-cap
-  
-  // note: the returned object does NOT include the method pointer: objc_msgSend() will do its own (dynamic ObjC) method dispatch every time this method is called on a given object; we do, however, assume that whatever method implementation appears on a given object, it will always have the exact same signature as the one we originally introspected (which should be a safe assumption as changing an argument type from e.g. ^@ to i or a return type from @ to void would be a Very Bad Idea all round)
-  return {
-    selector,
-    argc,
-    argumentTypes: argumentTypeEncodings,
-    returnType: returnTypeEncoding,
-    msgSend
-  };
 }
 
 
@@ -174,9 +215,11 @@ function wrapMethod(self, methodDefinition) {
     // argv : any -- the arguments passed by the caller, which must match the number and types of arguments expected by the ObjC method; if the wrong number or type of arguments is given, an error is thrown (bearing in mind that this treats all ObjC instances as type `id`; thus it's still possible to pass e.g. an NSArray where an NSString is expected, in which case the ObjC runtime and/or receiving method will let you know you've screwed up [or might not, since ObjC error reporting is marvelously vague and largely reliant on explicit nil checks])
 
 //let t = process.hrtime.bigint()
+
+try {
   
     if (argv.length != methodDefinition.argc - 2) {
-      throw new Error(`Expected ${argc - 2} arguments for method ${methodDefinition.selector.name} on object ${self.rawDescription()} but received ${argv.length}.`);
+      throw new Error(`Expected ${argc - 2} arguments for but received: ${argv.length}`);
     }
   
     // TO DO: fairly sure we can enforce ^@ args must be InOutRef
@@ -199,7 +242,7 @@ function wrapMethod(self, methodDefinition) {
       
       // straight off the bat, always reject undefined in the argument list
       if (arg === undefined) {
-        throw new Error(`Expected a value but received undefined.`);
+        throw new Error(`Expected a value for argument ${idx-1} but received: undefined`);
       }
       // this switch is temporary; eventually this logic should migrate into individual ffi-compatible codec functions that can be passed directly to ffi.ForeignFunction(); see TODOs on the coerceType() calls in introspectMethod() above
       switch (expectedArgumentType[0]) {
@@ -337,6 +380,13 @@ console.log('msgSend error: '+err);
 //console.log('pack res: '+methodName+': '+(Number(process.hrtime.bigint() - t)/1e6))
   
     return retval;
+    
+    
+} catch (e) {
+  e.message = `${self.name}.${methodDefinition.selector.tojs()}(...) ${e.message}`;
+  throw e;
+}
+    
   };
 };
 
@@ -346,14 +396,25 @@ console.log('msgSend error: '+err);
 // these wrap ObjC class/instance objects and are, in turn, wrapped by Proxies that provide access to their ObjC methods
 
 
+// TO DO: re. string representations, traditional Array and Date 'classes' represent themselves as "[Function: Array]" and "[Function: Date]" (since they're all just function until and unless blessed with `new` at a call site, at which point they return their stack frame encapsulated as an object), whereas ES6 'classes' represent as "[class Foo]" (really, they're all the same under the hood and inconsistencies in their naming schemes is historical)
+
+// TO DO: rawDescription should include ptr's hex address, to distinguish one instance from another
+
 class ObjCObject { 
 
   constructor(ptr) {
     this.__ptr = ptr;
   }
+   
+  // TO DO: inspect
   
-  // TO DO: should an unwrapped ObjCObject support any of toPrimitive, toString, inspect? if so, what should they return?
-  //[Symbol.toString]() { return this.rawDescription(); }
+  [Symbol.toString]() { return this.rawDescription(); }
+  
+  [Symbol.toPrimitive](hint) {
+    // hint : 'number' | 'string' | 'default'
+    // Result: number | string
+    return hint === 'number' ? Number.NaN : this.rawDescription();
+  }
 }
 
 
@@ -370,23 +431,12 @@ class ObjCClass extends ObjCObject {
     this.instanceMethodDefinitions = {};
   }
   
-  [Symbol.toPrimitive](hint) {
-    // hint : 'number' | 'string' | 'default'
-    // Result: number | string
-    if (hint === 'number') {
-      return Number.NaN;
-    } else {
-    
-    
-    // K, just to be clear: where is fricking `this` coming from here? because it seems to think it's a Proxy?
-    
-    
-      return this.rawDescription(); // note: traditional Array and Date 'classes' represent themselves as "[Function: Array]" and "[Function: Date]" (since they're all just function until and unless blessed with `new` at a call site, at which point they return their stack frame encapsulated as an object), whereas ES6 'classes' represent as "[class Foo]" (really, they're all the same under the hood and inconsistencies in their naming schemes is historical)
-    }
+  get name() {
+    return runtime.class_getName(this.__ptr);
   }
   
   rawDescription() { // pure JS representation; note: this method may be called in error reporting so it must not call any ObjC methods (e.g. ±[NSObject description]) itself (i.e. if the error is due to a bug in this module, reporting that error would trigger the bug, which would trigger another error, and so on... until the JS/ObjC call stack blows, the entire process crashes, or whatever)
-    return `[ObjCClass ${runtime.class_getName(this.__ptr)}]`; // TO DO: Q. what does class_getName and object_getClassName return if ptr is NULL? (i.e. do we need to confirm that __ptr is a non-NULL pointer before constructing this string, or can we safely assume ffi and/or the runtime function will return something non-breaking if this.__ptr is not valid? or do we just trust that this library will never call ObjCObject constructors with bad arguments? i.e. ObjCObject(…) should never be called with a non-ptr, and ptr.isNull() should be called to return null instead of an ObjCObject if the ptr is NULL)
+    return `[ObjCClass ${this.name}]`; // TO DO: Q. what does class_getName and object_getClassName return if ptr is NULL? (i.e. do we need to confirm that __ptr is a non-NULL pointer before constructing this string, or can we safely assume ffi and/or the runtime function will return something non-breaking if this.__ptr is not valid? or do we just trust that this library will never call ObjCObject constructors with bad arguments? i.e. ObjCObject(…) should never be called with a non-ptr, and ptr.isNull() should be called to return null instead of an ObjCObject if the ptr is NULL)
   }
   
   objcMethodPtr(selector) { // looks up and returns the C pointer to the specified class method; used by introspectMethod()
@@ -427,14 +477,6 @@ class ObjCInstance extends ObjCObject {
     }; // ObjC instance methods bound to this object, plus a couple shortcuts to the underlying objects
   }
   
-  /*
-  [toPrimitive](hint) {
-    // hint : 'number' | 'string' | 'default'
-    // Result: number | string
-    // TO DO:
-  }
-  */
-  
   rawDescription() { // pure JS representation, used for error reporting; this must not call `-[NSObject description]`
     return `[ObjCInstance ${runtime.object_getClassName(this.__ptr)}]`;
   }
@@ -472,28 +514,30 @@ function createMethodProxy(self) {
       if (!self instanceof ObjCObject) {
         throw new Error(`method Proxy expected ObjCObject but received ${typeof self}: ${self}`);
       }
-    
+      // 1. see if there's already a method wrapper by this name (this also handles __objCClass and __objCInstance keys)
       let method = self.cachedMethods[methodName];
 //      console.log('getting method: `'+String(methodName)+'`: '+typeof method);
       if (method === undefined) {
         
-//      console.log('calling: `'+String(methodName)+'`: '+typeof methodName);
+//      console.log(`method Proxy is looking up ${typeof methodName}: ${String(methodName)}`);
 
-        // lookup internal properties and standard JS keys, falling through if not known
+        // 2. next, deal with special cases (Symbol keys)
         switch (methodName) {
         case '__ptr': // TO DO: if there is a use-case for getting ObjCObject.__ptr directly, then this should be redefined as a constants.__objcObjectPtr for consistency with the other keys; we should also rename ObjCObject.__ptr to ObjCObject.ptr as it's a public attribute within the objc library (it's the ObjCObject that's private to the objc library implementation)
           //console.log(`TO DO: ${self}.__ptr is being accessed directly on method Proxy; this should be updated`);
           throw new Error(`TO DO: ${self.rawDescription()}.__ptr is being accessed directly on method Proxy; this should be updated`);
           return self.__ptr;
+        
         case constants.__objcObject:
           return self;
         
-        // TO DO: well this is mildly annoying - the point of putting these two constants in the ObjCObjects' method tables was so they'd never come as far as this switch block (and indeed there's a type check right after this block to reject any other Symbol and only accept String keys - i.e. ObjC method names), but something's clearly sneaking it into introspectMethod() by another route
+        // TO DO: should be able to delete the next 2 cases now, as cachedMethods lookup will always return these
         case constants.__objcClassPtr:
         case constants.__objcInstancePtr:
-        console.log('methodProxy['+String(methodName)+ '] -> '+typeof methodName)
+        console.log(`methodProxy is looking up '${String(methodName)}' in its switch statement but this is deprecated; please fix/update`);
           return self.cachedMethods[methodName];
         
+        // standard JS 'special' property keys
         case util.inspect.custom:
           return () => self.rawDescription(); // TO DO: should this return more detailed `±[NSObject description]`?
         case Symbol.toString: // TO DO: do we also need to define 'toString' and 'toPrimitive' as strings (pretty sure toPrimitive only needs defined as symbol; what about toString)? or does JS runtime/Proxy automatically recognize those names and convert them from strings to symbols?
@@ -503,22 +547,31 @@ function createMethodProxy(self) {
         case Symbol.toPrimitive:
           // TO DO: for now, only ObjCClass implements its own toPrimitive; once we have optimized NS<->JS converter functions that work on __ptrs directly, ObjCInstance[toPrimitive] can use that to convert itself directly, but for now js() needs the method wrapper to work so we have to call it from here
           // TO DO: when determining if a non-boolean object is equivalent to boolean true or false, does JS call toPrimitive? ideally an empty NSString or an NSNumber whose value is False/0/0.0 would also appear false-equivalent to JS; e.g. in Python, objects can implement a 'magic' __bool__ method if they wish to appear as True or False equivalent (any objects that don't implement __bool__ are always equivalent to True), and this is used by PyObjC's NSNumber, NSString, NSArray, and NSDictionary proxies to make those appear False equivalent when 0 or empty (i.e. consistent with its native 0, "", [], and {} values)
-          return self[Symbol.toPrimitive] || (hint => {
+          return (hint => {
             // hint : 'number' | 'string' | 'default'
             // Result: number | string
+            if (self[Symbol.toPrimitive]) {
+              // caution: while we'd like this switch block to return the ObjCObject's method directly, JS's Here Be Dragons implementation (which might be aided and abetted here by Proxy's own special behavior) means that if we return the toPrimitive method directly, JS treats that method's `this` as now bound to this Proxy, not to the class that actually owns that method; which is to say, at least within the Proxy's implementation, don't grab methods off the proxied objects (in this case the wrapped ObjCObject) and pass them around like closures because, while that sort of thing works perfectly in the likes of Python, JS makes an absolute arse of it
+              return self[Symbol.toPrimitive](hint);
+            }
             let obj = js(this, true); // quick-n-dirty (it is simpler to convert the ObjCInstance to JS value and have JS convert that, rather than go straight from ObjCInstance to JS retval - which would require replicating JS's own convoluted rules here); note: this should be non-strict, as unconvertible values will be turned below
+            // first, deal with any types that must/can be reduced to numbers...
             if (hint === 'number' || (hint === 'default' && (typeof obj === 'boolean' || typeof obj === 'number'))) {
-              return Number(obj); // returns NaN for objects that can't be converted to numbers; this is expected result
-            } else if (obj[constants.__objcInstancePtr] !== undefined) { // what about ObjC classes? (currently ObjCClass[Symbol.toPrimitive]('string') gets called by String(obj) below, which is probably sufficient, as it also uses the rawDescription for ObjCClass; for ObjCInstances though, rawDescription provides an inferior representation to calling -[NSObject description] to get its ObjC representation and wrapping that in the customary square brackets as is the JS style
-              return `[${this.description().UTF8String()}]`; // for ObjCInstances that cannot be converted to JS types, return their -[NSObject description] string enclosed in square brackets as-per [confusing] JS tradition, e.g. "[<NSWorkspace: 0x600000b186c0>]" // TO DO: should we forgo the square brackets, convert the 'angle brackets' if present to square brackets, or something else? (we should try to avoid creating strings where the outer brackets could be confused for a single-item Array)
+              return Number(obj); // returns NaN for objects that can't be converted to numbers; this is expected behavior (thus, any ObjCObjects that get to here, will return NaN)
+            // ...now deal with string representations; first, ObjCInstance...
+            } else if (obj[constants.__objcInstancePtr] !== undefined) {
+              // we need to handle ObjCInstances here, so we can call their -[NSObject description] to get a nice descriptive Cocoa-style string, which is typically of the format '<NSSomeClass address-or-other-identifying-info>', e.g. "[<NSWorkspace: 0x600000b186c0>]"; we then wrap this string in square brackets as is the JS tradition, and hope that users don't mistake the result for a single-item Array (we might want to work on ObjC instance representations some more later on)
+              return `[${this.description().UTF8String()}]`; // 
+            // ...and finally, ObjCClasses (which can stringify themselves) and JS values are left for JS to stringify
             } else {
-              return String(obj); // TO DO: (Array doesn't appear to have a toPrimitive method, so I’m guessing JS runtime calls its toString method which it does have)
+              return String(obj); // let JS do its own formatting of native JS values; this will also format (just to be JS-awkward, Array doesn't appear to have a Symbol.toPrimitive method, so I’m guessing JS runtime calls its toString method which it does have)
             }
           });
         }
-        // lookup ObjC method
         
-        if (methodName === 'rawDescription'){throw new Error( 'poomp '+self)}
+        // 3. anything else is either an unsupported Symbol key or a string, which is assumed to be the name of an ObjC method which has not previously been used so will be looked up (and also cached for resuse) now
+        
+        if (methodName === 'rawDescription'){throw new Error( 'poomp '+self)} // DEBUG: bugs willing, this can't get triggered again and can now be deleted
         
         if (!methodName instanceof String) { // if methodName is a symbol or garbage value, reject it; TO DO: or should this return `undefined`? (note: bindMethod also throws if methodName is not found on object, and while we do want to be consistent with JS behaviors when doing JS-y operations, there's a decent argument for being more rigorous wrt method lookups in particular; we just need to watch out if there are any newer JS runtime behaviors where looking up an unsupported key on objects is *expected* to return undefined, as throwing an error won't match that expectation, which could cause problems in compatibility situations where JS would know how to recover from an undefined result but not from an error; e.g. JS knows if a value doesn't have a toPrimitive method then to try toString instead, so what would happen if our object threw an error on failed toPrimitive lookup - would JS still try toString, or would it suppress/forward that error?)
           throw new Error(`${self.rawDescription()}[${methodName}] is undefined`);
@@ -528,7 +581,7 @@ function createMethodProxy(self) {
       
 //console.log('lookup '+methodName+': '+(Number(process.hrtime.bigint() - t)/1e6))
       
-      
+      // 4. return the result 
       return method;
     },
     

@@ -60,21 +60,31 @@ class Selector {
   }
   
   static fromjs(methodName) { // create a Selector from JS-style name, e.g. "foo_bar_"
-  // TO DO: JS->NS name conversion should really be done on Selector, not here
-  // method names are almost unambiguous: colons translate to underscores, and underscores to double underscores; the only time this would break is where a method name contains '::' (i.e. no text between the arguments, which is unlikely but - IIRC - legal)
-  let objcName = methodName.replace(/__?/g, s => s.length === 1 ? ':' : '_');
-  return new Selector(objcName);
-  // TO DO: I've commented out the following as its purpose is not clear; I suspect it's intended to handle ambiguities in method naming, e.g. when user forgets a trailing underscore or when the ObjC name already includes underscores (e.g. `foo_bar:baz:`), but TBH the best way to handle ambiguities is not to permit them in the first place (the road to hell is already paved with "helpful, user-friendly" APIs: SGML, OAuth2, AppleScript, etc, etc, etc, which invariably aren't because their rules are so convoluted they are virtually unlearnable)
-  /*
-  if (selector.name.includes('_')) {
-    for (const permutation of selector.permutations()) { // TO DO: what is purpose of this? presumably we need to support underscores in method names which do not correspond to arguments, although sensible way to do that is to add both JS and ObjC-style names to method cache, e.g. `foo_bar:baz:` and `foo_bar_baz_`, or escape underscores in name with a second underscore, e.g. `foo__bar_baz_`, or possibly omit the problem JS names entirely; we also need to watch out for leading underscores as those shouldn't convert to colons
-      if (object.respondsToSelector(permutation)) {
-        selector = permutation;
-        break;
+    // TO DO: method names are almost unambiguous: colons translate to underscores, and underscores to double underscores; the only time this would break is where a method name contains '::' (i.e. no text between the arguments, which is unlikely but - IIRC - legal)
+    let objcName = methodName.replace(/__?/g, s => s.length === 1 ? ':' : '_');
+    return new Selector(objcName);
+    // TO DO: I've commented out the following as its purpose is not clear; I suspect it's intended to handle ambiguities in method naming, e.g. when user forgets a trailing underscore or when the ObjC name already includes underscores (e.g. `foo_bar:baz:`), but TBH the best way to handle ambiguities is not to permit them in the first place (the road to hell is already paved with "helpful, user-friendly" APIs: SGML, OAuth2, AppleScript, etc, etc, etc, which invariably aren't because their rules are so convoluted they are virtually unlearnable)
+    /*
+    if (selector.name.includes('_')) {
+      for (const permutation of selector.permutations()) { // TO DO: what is purpose of this? presumably we need to support underscores in method names which do not correspond to arguments, although sensible way to do that is to add both JS and ObjC-style names to method cache, e.g. `foo_bar:baz:` and `foo_bar_baz_`, or escape underscores in name with a second underscore, e.g. `foo__bar_baz_`, or possibly omit the problem JS names entirely; we also need to watch out for leading underscores as those shouldn't convert to colons
+        if (object.respondsToSelector(permutation)) {
+          selector = permutation;
+          break;
+        }
       }
-    }
-  }*/
-}
+    }*/
+  }
+  
+  tojs() { // TO DO: see above TODO re. ambiguity
+    return this.name.replace(/[:_]/g, s => {
+      switch (s) {
+      case ':':
+        return '_';
+      case '_':
+        return '__';
+      }
+    });
+  }
 
   get name() {
     return sel_getName(this.__ptr);

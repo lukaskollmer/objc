@@ -27,11 +27,10 @@ const libobjc = new ffi.Library('libobjc', {
 
   // Methods
   method_getTypeEncoding        : ['string',  ['pointer']],
-  method_getImplementation      : ['pointer', ['pointer']],
-  method_getTypeEncoding        : ['string',  ['pointer']],
+  method_getNumberOfArguments   : ['int',     ['pointer']],
   method_copyReturnType         : ['string',  ['pointer']],
   method_copyArgumentType       : ['string',  ['pointer', 'int']],
-  method_getNumberOfArguments   : ['int',     ['pointer']],
+  method_getImplementation      : ['pointer', ['pointer']],
   method_exchangeImplementations: ['void',    ['pointer', 'pointer']],
   method_setImplementation      : ['pointer', ['pointer', 'pointer']],
 

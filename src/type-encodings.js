@@ -107,7 +107,7 @@ class DataStructurePrimitive extends DataStructure {
     const type = this.type === 'string' ? 'CString' : this.type;
     const refType = ref.types[type];
     if (refType) return refType; // eslint-disable-line curly
-    throw new Error(`Unknown type ${type}`);
+    throw new Error(`Unknown type '${type}'`);
   }
 }
 
@@ -217,7 +217,7 @@ class TypeEncodingParser {
           this.step();
           retval = type;
         } else {
-          throw new Error(`Unexpected token ${this.currentToken}`);
+          throw new Error(`Unexpected token '${this.currentToken}'`);
         }
 
         // Problem: type encodings for method parameters can contain offsets

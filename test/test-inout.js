@@ -34,3 +34,5 @@ if (error) { error = error.description().UTF8String() }
 console.log("compileAndReturnError: success=" + res + '  err=' + error)
 //console.log('J: <'+v.description().UTF8String()+'>')
 
+console.log('test class: '+objc.NSString)
+
