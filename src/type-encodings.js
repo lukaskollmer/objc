@@ -52,7 +52,7 @@ function introspectMethod(object, selector) {
   //console.log(`\nbindMethod: ${object} "${selector.name}" "${runtime.method_getTypeEncoding(method)}"`);
 
 
-//  console.log(`introspecting '${object.rawDescription()}.${selector.tojs()}' found=${method && !method.isNull()}`)
+//  console.log(`introspecting '${object.toDescription()}.${selector.tojs()}' found=${method && !method.isNull()}`)
   if (method === undefined || method.isNull()) { // TO DO: when does objcMethodPtr return undefined as opposed to NULL ptr?
 
 

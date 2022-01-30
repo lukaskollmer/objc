@@ -24,7 +24,7 @@ for (i=0;i<n;i++) {
 	//console.log()
 }
 
-console.log('J: '+(Number(process.hrtime.bigint() - t)/1e9)+'sec')///1000000)/n+'ms')
+console.log('J: '+(Number(process.hrtime.bigint() - t)/1e9)+'sec')
 
 
 console.log(i+' ' + typeof v+' = '+v) // 10000 object = [ObjCInstance __NSCFConstantString]

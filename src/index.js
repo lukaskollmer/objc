@@ -1,5 +1,6 @@
 // objc
 
+const constants = require('./constants');
 const types = require('./types');
 const runtime = require('./runtime');
 const instance = require('./instance');
@@ -39,6 +40,7 @@ module.exports = new Proxy({
   // type checking (note: users should use these functions to identify ObjC objects rather than e.g. `object instanceof objc.__internal__.ObjCInstance`, unless they really understand what they're doing)
   isClass: instance.isWrappedObjCClass,
   isInstance: instance.isWrappedObjCInstance,
+  isObjC: (object) => object && object[constants.__objcObject] !== undefined,
   
   // creating ObjC-specific types
   types,
@@ -89,7 +91,7 @@ module.exports = new Proxy({
       
         //console.log(`creating symbol: ${runtime.object_getClassName(ptr)}`);
         
-        obj = instance.getClassByName(runtime.object_getClassName(ptr));
+        obj = instance.wrapInstance(ptr);
         builtins[key] = obj;
         
         // originally: obj = (new InstanceProxy(new Instance(ptr))).UTF8String(); // TO DO: why call UTF8String() to convert back to JS string? the only reason to get these keys is to use them in ObjC APIs, so converting to JS strings is creating extra work; the main gotcha is when using NSStrings as JS object keys, but that can be addressed by having toString()/toPrimitive() return -UTF8String instead of -description when the ObjC object isKindOfClass:NSString (note that -[NSString description] already does this, returning NSString's actual value instead of descriptive representation as is case for e.g. -[NSArray description] and others, so all we're doing is avoiding the "[ObjCInstance CLASS DESCRIPTION]" JS-style description string that will be generated for most NS classes) // for now, let's leave the value as an ObjC instance

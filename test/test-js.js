@@ -2,8 +2,25 @@
 
 const objc = require('objc')
 
-//let v = objc.NSString.stringWithString_('')
+// console.log(objc.NSData.data()) // this needs workΩ as it's returning a raw inspection string of the ObjCInstance and its contents, which is NOT what we want to display
 
+//let v = objc.NSString.stringWithString_('ok')
+
+/*
+
+// TO DO: this really hammers ObjC method calls // (objc.js is a particularly bad offender)
+
+let v = 44
+
+v = objc.NSMutableArray.arrayWithObject_(v)
+
+v = objc.ns(v)
+
+v.addObject_(objc.NSAppleScriptErrorAppName)
+
+console.log('v is ObjC instance = '+objc.isInstance(v))
+console.log(`test-js: instance representation = '${v}'`) // "[ObjCInstance NSString]"
+*/
 
 
 /*
@@ -30,6 +47,7 @@ Error: BUG: ObjCClass[Symbol.toPrimitive] thinks 'this' is a method Proxy, not i
 */
 
 //objc.NSString.blahBlah
+//console.log()
 
-console.log('test class: '+objc.NSString) // "test class: [ObjCClass NSString]"
+console.log(`class representation: '${objc.NSString}'`) // "[ObjCClass NSString]"
 

@@ -11,10 +11,13 @@ const constants = require('./constants');
 const Selector = require('./selector');
 
 
+let debugLog = function(){}
+//debugLog = console.log
 
-// curse you, circular references
+
+
+// curse you, circular references (./instance.js needs this module but this module also needs ./instance.js); this keeps a second cache of wrapped ObjCClasses for NSString, NSNumber, etc for use below; eventually we will need those wrapped classes only for constructing ObjCInstances as everything else will be done on underlying pointers and raw ffi calls; and at that point we can see if this can be rationalized then, or even moved into instances.js to eliminate the circular ref problem
 const _classes = {};
-
 
 const getClass = classname => {
   let obj = _classes[classname];
@@ -34,12 +37,21 @@ const js = (object, returnInputIfUnableToConvert = false) => { // TO DO: recomme
   
 //let t = process.hrtime.bigint();
   
-  // everything that isn't an ObjCClass/ObjCInstance gets passed straight thru (although it is irritating that undefined and null throw when you try to look up attributes on them, hence the extra tests); TO DO: should js() reject `undefined` argument as a type error?
+  // everything that isn't an ObjCClass/ObjCInstance gets passed straight thru (although it is irritating that undefined and null throw when you try to look up attributes on them, hence the extra tests); TO DO: should js() reject `undefined` object arg as a type error? or even go further and make all objects except ObjCObject and null a type error?
+  
+  debugLog('calling js()...'+object[constants.__objcObject]+';'+object[constants.__objcInstancePtr]+';')
   if (object === undefined || object === null || object[constants.__objcObject] === undefined) {
     retvalue = object;
+  debugLog('...noped')
+  
   
   // TO DO: this could be streamlined by getting __objcInstancePtr and passing its ptr directly to prebuilt ForeignFunction (although, TBF, once method wrappers are fully streamlined there might be very little difference)
+  
+  // TO DO: we could also streamline this by getting object's class, which is an ObjCClass, and checking if its one of our known objc.CLASSes (whether by comparing ObjCClass objects for identity, or comparing underlying Class pointer Buffers for equality); obviously with some of these being class clusters they will need to know which classes are in that class, but we can let it figure out for itself by first trying identity check on the ObjCClass and then trying the slower isKindOfClass_ tests below, and if one of the latter matches then add the ObjCClass to our lookup table above; in turn the unpackers can be converted to functions which the lookup table can return (basically, 2 tables: one canonical keys—NSNumber, NSString, NSArray, etc—and another with class cluster members—__NSCFBoolean, __NSCFConstantString, __NSSingleObjectArrayI, etc)
+  
   } else if (object.isKindOfClass_(getClass('NSString'))) {
+  
+  debugLog('is an nsstring')
     retvalue = object.UTF8String(); // eslint-disable-line new-cap
   
 //  } else if (object.isKindOfClass_(getClass('__NSCFBoolean'))) { // TO DO: see below
@@ -53,7 +65,7 @@ const js = (object, returnInputIfUnableToConvert = false) => { // TO DO: recomme
     retvalue = new Date(object.timeIntervalSince1970() * 1000);
   
   } else if (object.isKindOfClass_(getClass('NSArray'))) {
-    retvalue = [];
+    retvalue = []; // TO DO: we could return a Proxy'd Array that encapsulates the ObjC NSArray and an initially lazy JS Array and lazily converts its items from NS to JS on first access
     for (const obj of object) {
       retvalue.push(js(obj, true)); // note that the JS Array conversion may be shallow (i.e. items within the NSArray will be converted to JS types if possible but any non-bridged items will remain as ObjCObjects)
     }
@@ -61,16 +73,16 @@ const js = (object, returnInputIfUnableToConvert = false) => { // TO DO: recomme
   } else if (object.isKindOfClass_(getClass('NSDictionary'))) {
     retvalue = {};
     for (const key of object) {
-      retvalue[String(key)] = js(object.objectForKey_(key), true);
+      retvalue[String(key)] = js(object.objectForKey_(key), true); // TO DO: this mapping is highly problematic, as key conversions (for anything except NSString or NSNumber) will be lossy, with no roundtripping, risks of key collisions, and likely unreadable too; if we really want a native JS structure, we might need to define our own with discrete methods for getting/setting/deleting keys (in which case we might be as well to have that wrap the NSDictionary that lazily converts NS keys and values to JS)
     }
 
   } else {
-
+    debugLog('js() barfed')
     // Return null if there's no JS counterpart for the objc type // TO DO: unconvertable objects should either return as-is or throw a "can't convert ${object.class}"; returning null, while it appears to replicate ObjC’s standard behavior where methods returning nil to indicate an error occurred, is ambiguous as it does not distinguish between that "the value is a nil" and "threw away data cos it couldn't be translated"; also, bear in mind that when an ObjC object doesn't recognize a message, e.g. `[(id)object doubleValue]`, the ObjC runtime raises a fatal 'unrecognized selector' exception - which might be the better analogy here
     retvalue = returnInputIfUnableToConvert ? object : null;
   }
   
-//console.log(`js(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
+//debugLog(`js(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
   
   return retvalue;
 };
@@ -121,7 +133,7 @@ const ns = (object) => {
     retvalue = null;
   }
   
-//console.log(`ns(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
+//debugLog(`ns(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
 
   return retvalue;
 };
