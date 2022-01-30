@@ -56,7 +56,7 @@ function introspectMethod(object, selector) {
   if (method === undefined || method.isNull()) { // TO DO: when does objcMethodPtr return undefined as opposed to NULL ptr?
 
 
-    throw new Error(`No method named '${selector.name}'`);
+    throw new TypeError(`No method named objc.${object.name}.${selector.tojs()}`);
   }
 
   // TO DO: would method_getTypeEncoding() be faster than using method_copyReturnType and method_copyArgumentType?
@@ -65,7 +65,7 @@ function introspectMethod(object, selector) {
   //console.log(`  return type {$i} "${returnTypeEncoding}"`);
   
   // TO DO: for now, strip any out/inout/etc prefixes from ObjC type codes
-  const returnType = coerceType(returnTypeEncoding.replace(/[rnNoORV]+/, '')); // get ffi type // TO DO: coerceType() discards ObjC-specific mapping info and treats all ObjC types as C types, necessitating an extra layer of type conversion code in the method wrapper below before it calls msgSend; whereas if we can pass ObjC-aware codecs to ffi.ForeignFunction(…) below, the method wrapper can call msgSend directly, simplifying this code and (hopefully) speeding up argument and return value conversions (currently the biggest performance bottleneck now that method lookups are cached)
+  const returnType = coerceType(returnTypeEncoding.replace(/[rnNoORV]+/, '')); // get ffi type // TO DO: coerceType() discards ObjC-specific mapping info and treats all ObjC types as C types, necessitating an extra layer of type conversion code in the method wrapper below before it calls msgSend; whereas if we can pass ObjC-aware codecs to ffi.ForeignFunction(…) below, the method wrapper can call msgSend directly, simplifying this code and (hopefully) speeding up argument and return value conversions (currently the biggest performance bottleneck now that method lookups are cached) // also, the numbers are offsets (to what exactly, not sure; possibly the byte width of each argument/result?)
 
   // this count includes the first 2 arguments (object and selector) to every ObjC method call
   const argc = runtime.method_getNumberOfArguments(method);
@@ -257,7 +257,7 @@ class DataStructureUnion extends DataStructureStruct {
 // ObjC type encoding parser
 
 
-const isNumber = arg => !isNaN(parseInt(arg, 10));
+const isNumber = arg => !isNaN(parseInt(arg, 10)); // Q. how does this differ to Number(arg)?
 
 const guard = (cond, errorMessage) => {
   if (!cond) {
@@ -396,7 +396,8 @@ class TypeEncodingParser {
 const parser = new TypeEncodingParser();
 
 
-const coerceType = type => { // this seems like it wants to extend ffi-ref's coerceType() to handle ObjC types as well; however, it doesn't appear to call coerceType to handle and, more problematically, is throwing away ObjC-specific type information which could be used in ffi.ForeignFunction instead of having one step for mapping ObjC-specific types (in the method wrapper) and another step (ForeignFunction) for mapping C types
+const coerceType = type => { // this seems like it wants to extend ffi-ref's coerceType() to handle ObjC types as well; however, it doesn't appear to call coerceType to handle and, more problematically, is throwing away ObjC-specific type information which could be used in ffi.ForeignFunction instead of having one step for mapping ObjC-specific types (in the method wrapper) and another step (ForeignFunction) for mapping C types 
+  // BTW, "coerceType" is a lousy name for this function as it performs name lookup/mapping, not data conversion, but that's ref-napi's poor choice so keeping it here may be best for consistency, assuming we extend it to support ObjC encodings in addition to ref's own C encodings (there is a lot of overlap between them, though we need to be certain that encoding names can't conflict, and ObjC modifiers for inout etc also add their own complexity); though ultimately we might define a coerceObjCType function purely for handling ObjC type encodings (it'd still return ref's existing codecs for C types, or possibly copies of those annotated with ObjC names, plus our ObjC-only codecs)
   if (typeof type === 'string') {
     if (type === 'pointer') {
       return ref.refType(ref.types.void);

@@ -96,10 +96,10 @@ function introspectMethod(object, methodName) {
   try {
     // sanity checks; TO DO: get rid of these once satisfied callers always pass correct argument types
     if (!object instanceof ObjCObject || object[constants.__objcObject]) {
-      throw new Error(`expected an unwrapped ObjCObject but received ${typeof object}`);
+      throw new TypeError(`introspectMethod expected an unwrapped ObjCObject but received ${typeof object}`);
     }
     if (!constants.isString(methodName)) {
-      throw new Error(`expected a string name but received ${typeof methodName}`);
+      throw new TypeError(`introspectMethod expected a string name but received ${typeof methodName}`);
     }
     let signature = encodings.introspectMethod(object, Selector.fromjs(methodName));
     return signature;
@@ -316,44 +316,29 @@ debugLog('>>callObjCMethod: '+methodDefinition.selector.name)
 
 // TO DO: re. string representations, traditional Array and Date 'classes' represent themselves as "[Function: Array]" and "[Function: Date]" (since they're all just function until and unless blessed with `new` at a call site, at which point they return their stack frame encapsulated as an object), whereas ES6 'classes' represent as "[class Foo]" (really, they're all the same under the hood and inconsistencies in their naming schemes is historical)
 
-// TO DO: toDescription should include ptr's hex address, to distinguish one instance from another
-
+// TO DO: ObjCInstance.tojs() should include ptr's hex address, to distinguish one instance from another
 
 class ObjCObject { // internal to objc, but can be accessed externally if required with standard caveat emptor
 
   constructor(ptr) {
-    this.__ptr = ptr; // this should be treated as private to ObjCObject
+    this.__ptr = ptr; // this should be treated as private to ObjCObject (i.e. don't go assigning to it)
   }
   
   get ptr() { // read-only ptr property is nominally public (being used within objc, and needed when e.g. using NSObjects in CoreFoundation APIs via toll-free bridging)
     return this.__ptr;
   }
   
-  // TO DO: do we need this or can we rely on JS to create representation using toStringTag
-  toDescription() { // pure JS representation; note: this method may be called in error reporting so it must not call any ObjC methods (e.g. ±[NSObject description]) itself (i.e. if the error is due to a bug in this module, reporting that error would trigger the bug, which would trigger another error, and so on... until the JS/ObjC call stack blows, the entire process crashes, or whatever)
-    debugLog('toDescription: '+this)
-    return `[${this.toStringTag}]`; // TO DO: Q. what does class_getName and object_getClassName return if ptr is NULL? (i.e. do we need to confirm that __ptr is a non-NULL pointer before constructing this string, or can we safely assume ffi and/or the runtime function will return something non-breaking if this.__ptr is not valid? or do we just trust that this library will never call ObjCObject constructors with bad arguments? i.e. ObjCObject(…) should never be called with a non-ptr, and ptr.isNull() should be called to return null instead of an ObjCObject if the ptr is NULL)
+	get [Symbol.toStringTag]() {
+	  //console.log(`>>toStringTag for ${this.constructor.name}\n${new Error().stack}`);//: ${this.name};`);
+    return `${this.constructor.name}=${this.name}`;
   }
   
-
-  // important: ObjCObjects should themselves always be treated as boolean true, so must don't implement [Symbol.toString]/[Symbol.toPrimitive] directly (the method wrapper can, however, return “false-y” values)
-  	
-//	[Symbol.toString]() { debugLog('>>[Symbol.toString]'); return this.toDescription(); }
+  [Symbol.toString]() { // TO DO: this returns ObjC's description string, which might not be what we want, but let's see how it goes for now
+    return (this.cachedMethods['description'] || this.bindMethod(methodName)).UTF8String();
+  } // TO DO: if more ObjCObject methods need to call ObjC methods, we can implement general `callMethod(methodName,...argv)` on ObjCClass and ObjCInstance, allowing them to be used without going through wrapper first (e.g. `this.callMethod('description').UTF8String()`)
   
-//	toPrimitive(hint)       {debugLog('>>toPrimitive');  return this[Symbol.toPrimitive](hint); }
-//	[util.inspect.custom]() {debugLog('>>util.inspect.custom');   return 'XXXXXX'; this.toDescription(); }
-  
-	get [Symbol.toStringTag]() { 
-	  debugLog('>>toStringTag  '+`${this.constructor.name}: ${this.name};`);
-    return `${this.constructor.name}: ${this.name}`;
-  } // TO DO: confirm this is correct method definition for toStringTag
-  
-  toPrimitiveValue(hint) { // TO DO: once ObjCInstance implements Symbol.toPrimitive, rename this method to same
-    // hint : 'number' | 'string' | 'default'
-    // Result: number | string
-    debugLog('toPrimitiveValue '+this)
-    return hint === 'number' ? Number.NaN : this.toDescription(); // TO DO: or String(this)?
-  }
+  // TO DO: implement inspect on ObjCObjects?
+//	[util.inspect.custom]() {debugLog('>>util.inspect.custom'); return this.tojs(); }
   
   // TO DO: what else needs [re]implemented on ObjCObjects and/or their method Proxy wrapper?
   
@@ -373,10 +358,23 @@ class ObjCClass extends ObjCObject {
     };
     // cache the signatures for the class's instance methods (the wrapped ObjC instance methods will be cached in the individual ObjCInstances)
     this.instanceMethodDefinitions = {};
+    this.__name = runtime.class_getName(ptr);
   }
   
   get name() {
-    return runtime.class_getName(this.__ptr);
+//  console.log('getting ObjCClass.name = '+this.__name)
+    return this.__name;
+  }
+  
+//	get [Symbol.toStringTag]() { // TO DO: this overrides ObjCObject's implementation, but not sure we want to do that
+	  //console.log(`>>toStringTag for ${this.constructor.name}\n${new Error().stack}`);//: ${this.name};`);
+//    return `objc.${this.name}`; // TO DO: should string tag be literal representation OR non-literal description, e.g. "objc.NSString" or "Wrapped-ObjCClass=NSString"?
+//  }
+  
+  tojs(hint = 'default') { // seems to be Proxy[toPrimitive] that gets called
+    // hint : 'number' | 'string' | 'default'
+    // Result: number | string
+    return hint === 'number' ? Number.NaN : `[ObjCClass: ${this.name}]`; // TO DO: how to represent a class? a parenthesized literal expression might be best, e.g. `(objc.NSString)`, as it is both self-descriptive and can-be copy+pasted+evaluated to recreate it; however, that doesn't work so well with instances, where we'd need to replicate the constructor and arguments as literals as well (we might eventually do that for the bridged Foundation types, but anything else is probably best using the ObjC description string)
   }
   
   objcMethodPtr(selector) { // looks up and returns the C pointer to the specified class method; used by introspectMethod()
@@ -399,7 +397,6 @@ class ObjCClass extends ObjCObject {
     }
     return wrapMethod(instanceObject, methodDefinition);
   }
-
 }
 
 
@@ -420,6 +417,19 @@ class ObjCInstance extends ObjCObject {
   
   get name() {
     return runtime.object_getClassName(this.__ptr);
+  }
+  
+  tojs(hint = 'default') { // we won't define [toPrimitive] on ObjCObjects as it all gets very confusing and unhelpful, but the method Proxy's [toPrimitive](hint) calls ObjCObject.tojs(hint)
+    // hint : 'number' | 'string' | 'default'
+    // Result: number | string
+    switch (hint) {
+    case 'number':
+      return Number.NaN; // TO DO: should handle NSNumber
+    case 'string':
+      return this[Symbol.toString](); // ObjC description string // for now, this invokes [NSObject description] and returns that ObjC-style string, though we might want to adjust that later to bring it more in line with JS's toPrimitive
+    default:
+      return this[Symbol.toString](); // TO DO: need exception for NSNumber (not __NSCFBoolean) and NSArray containing a single NSNumber (since JS seems to like reducing `[3]` to `3`); also, should we allow this to return undefined/null, so Proxy can use it for valueOf too? (on returning undefined, the Proxy would return the proxyObject unchanged, which I believe is ther expected behavior for valueOf when it encounters JS objects that can't be reduced to primitives without data loss, whereas toPrimitive always forces objects to string or number and damn all the data loss)
+    }
   }
   
   objcMethodPtr(selector) { // looks up and returns the C pointer to the specified instance method; used by bindMethod()
@@ -458,10 +468,10 @@ function createMethodProxy(obj) {
   //
   // As a rule, client code should not need to access the underlying ObjCObject or ObjC pointer, except when working with ffi directly, e.g. when calling a C function that takes a `Class` or `id` argument (i.e. the underlying ObjC pointer); it is also possible to call CoreFoundation functions passing a toll-free-bridged ObjC pointer where a CFTYPERef is expected, caveat ownership remains with ObjC's ARC (transferring ObjC object ownership to/from CF's manual refcounting is left as an exercise to brave/expert/foolhardy readers)
   //
-  return new Proxy(obj, { // TO DO: can we set Proxy's name? e.g. 'ObjCObjectWrapper'
-    get: function (objcObject, methodName, proxyObject) {        
+  return new Proxy(obj, { // no way to customize Proxy's name, unfortunately, or we'd call this MethodProxy so that it's easy to identify in stack traces
+    get: function (objcObject, methodName, proxyObject) {
       
-       debugLog(`method Proxy is looking up ${typeof methodName}: ${String(methodName)}…`);
+//       console.log(`method Proxy is looking up ${typeof methodName}: ${String(methodName)}…`);
       
       if (!(objcObject instanceof ObjCObject)) {
         throw new Error(`method Proxy expected ObjCObject but received ${typeof objcObject}: ${objcObject}`);
@@ -495,10 +505,6 @@ function createMethodProxy(obj) {
         
         
         // inspection/coercion
-        
-        case 'toDescription': // TO DO: don't want this, so aim to get rid of it (or change to a symbol if unavoidable)
-          debugLog(`Warning: getting deprecated ${methodName} property on method Proxy`);
-          return () => objcObject.toDescription();
         
         case util.inspect.custom:
           debugLog(`returning function for method Proxy's util.inspect.custom`)
@@ -540,11 +546,13 @@ try {
             debugLog('proxyObject is a wrapped ObjCInstance: '+isWrappedObjCInstance(proxyObject))
             debugLog('proxyObject is an unwrapped ObjCInstance: '+(proxyObject instanceof ObjCInstance))
   
-            if (objcObject instanceof ObjCClass) { return objcObject.toPrimitiveValue(hint); }
+            if (objcObject instanceof ObjCClass) {
+              return objcObject.tojs(hint);
+            }
             let obj = converters.js(proxyObject, true); // quick-n-dirty (it is simpler to convert the ObjCInstance to JS value and have JS convert that, rather than go straight from ObjCInstance to JS retval - which would require replicating JS's own convoluted rules here); note: this should be non-strict, as unconvertible values will be turned below; that said, js() will be more efficient once it maps the ObjC ptr for NSString, NSNumber, etc directly to their corresponding JS types, as JS will already be quite efficient at getting those JS objects' string/number representation (although I wonder why it only does those and not 'boolean' too; but…JS)
             debugLog('tried converting to js => '+typeof obj)
             // first, deal with any types that must/can be reduced to numbers...
-            if (hint === 'number' || (hint === 'default' && (typeof obj === 'boolean' || typeof obj === 'number'))) {
+            if (hint === 'number' || (hint === 'default' && (constants.isBoolean(obj) || constants.isNumber(obj)))) {
               return Number(obj); // returns NaN for objects that can't be converted to numbers; this is expected behavior (thus, any ObjCObjects that get to here, will return NaN)
             // ...now deal with string representations; first, ObjCInstance...
             } else if (obj !== undefined && obj !== null && obj[constants.__objcInstancePtr]) { // null or undefined = not a wrapped ObjCInstance

@@ -2,6 +2,8 @@
 
 // ns, js functions for converting the standard JS types to their NS equivalents and back
 
+// TO DO: rename 'converters.js'? 'mappers.js'?
+
 // note: mutable JS values (arrays, objects) are converted to their immutable NS counterparts
 
 // TO DO: once the behavior of ns() and js() is finalized, performance optimize them as much as possible as converting to and from standard JS types will be a significant bottleneck; e.g. bypass ./instance.js's high-level wrappers and use the ffi APIs directly, (since there's only a half-dozen JS types to bridge, it's worth the extra coding); much of the safety checks that are performed when user calls arbitrary methods with arbitrary arguments can be skipped; as well as bypassing at least some of ./instance.js's class and method wrappers (with their associated overheads, particularly when packing/unpacking arrays and dictionaries), it might even be possible to skip some of the ObjC dynamic dispatch (objc_msgSend itself is very fast, but our wrapper code around it adds its own non-trivial overhead) and assign the classes and methods' underlying C pointers to consts and use those directly with FFI APIs
@@ -21,7 +23,7 @@ const _classes = {};
 
 const getClass = classname => {
   let obj = _classes[classname];
-  if (!obj) { 
+  if (!obj) {
     obj = _classes[classname] = require('./instance').getClassByName(classname);
   }
   return obj;
@@ -97,7 +99,7 @@ const ns = (object) => {
   if (object === undefined) {
     throw new Error('objc.ns() expected a value but received undefined.'); // should really be a type error
   
-  } else if (object === null || object[constants.__objcObject] !== undefined) { // only issue with this is that it allows an ObjCClass to pass thru, whereas objc.ns() should maybe guarantee always to return an ObjCInstance (since passing a `Class` where an `id` is expected probably isn't what ObjC APIs want to deal with); that said, `NSArray.arrayWithObject_(NSString)` works in PyObjC, so if ObjC seems willing to treat an ObjC class as `id` then who are we to argue?
+  } else if (object === null || object[constants.__objcObject]) {
     retvalue = object;
     
   } else if (constants.isString(object)) { // String -> NSString
@@ -115,7 +117,7 @@ const ns = (object) => {
       retvalue.addObject_(ns(object[i]));
     }
     
-  } else if (typeof object === 'number') { // Number -> NSNumber
+  } else if (constants.isNumber(object)) { // Number -> NSNumber
     retvalue = getClass('NSNumber').numberWithDouble_(object);
   
   } else if (typeof object === 'object') { // Object -> NSDictionary // TO DO: problem with this is that presumably any JS object except String, Date, Array will end up here, and if that object is anything other than simple key-value data then it is going to discard parts of that object, preventing it passing through the ObjC runtime and back to JS in working order; e.g. an object like `{a:1, b:true}` will roundtrip fine, but `new Foo(…)` won't
@@ -124,13 +126,13 @@ const ns = (object) => {
       retvalue.setObject_forKey_(object[key], key);
     }
   
-  } else if (typeof object === 'boolean') {
+  } else if (constants.isBoolean(object)) {
     retvalue = getClass('NSNumber').numberWithBool_(object); // confirm this is appropriate 
     // note: PyObjC seems to treat NSNumber.numberWithBool_ calls as a special case, as it returns a native True/False rather than, say, a <class 'objc.pyobjc_bool'> (I suspect that since a bool->NSNumber conversion is inherently cheap, PyObjC just leaves it until it's packing the arguments for objc_msgSend)
     
   } else {
-    // Return null if there's no objc counterpart for the js type // TO DO: shouldn't this throw? (alternatively, it might be possible to wrap JS-only values in an opaque NSValue, allowing them to pass through ObjC APIs unchanged, although there are probably issues there with JS's GC not knowing the value is non-collectable; to answer this question: list any JS types that won't be handled by one of the above cases)
-    retvalue = null;
+    // TO DO: it might be possible to wrap JS-only values in an opaque NSValue, allowing them to pass through ObjC APIs unchanged (lthough there are probably issues there with JS's GC not knowing the value is non-collectable); determine the JS types not handled above—Symbol, Buffer, Function, etc—and decide which, if any, should be allowed through in boxed form; also, is there a way to distinguish objects created from ES6 classes and provide option for client code to install their own codecs for mapping those
+    throw new TypeError(`objc.ns() expected a JS primitive, Date, Array, object, or ObjC object, but received: ${typeof object === 'object' ? object.constructor.name : typeof object}`);
   }
   
 //debugLog(`ns(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
