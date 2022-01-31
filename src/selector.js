@@ -10,7 +10,8 @@
 // BTW, once the mapping is finalized and implemented as Selector methods, it is trivial to provide a CLI utility script that reads an NS-style selector name string from line input and prints its JS representation to stdout (and vice-versa), and tell users who need assistance translating a method’s syntax to go use that
 
 
-const {sel_getUid, sel_getName} = require('./runtime');
+const constants = require('./constants');
+const runtime = require('./runtime');
 
 
 
@@ -18,8 +19,8 @@ class Selector {
 
   constructor(input) { // create a Selector from string (e.g. 'foo:bar:') or existing SEL ptr
     // caution: this (public) constructor does not type check to ensure the given value is a string/SEL
-    if (typeof input === 'string') {
-      this.__ptr = sel_getUid(input);
+    if (constants.isString(input)) {
+      this.__ptr = runtime.sel_getUid(input);
     } else {
       this.__ptr = input;
     }
@@ -44,10 +45,12 @@ class Selector {
 
   get name() { 
     // Result: string -- the method's ObjC (colon-delimited) name
-    return sel_getName(this.__ptr);
+    return runtime.sel_getName(this.__ptr);
   }
   
   get ptr() { return this.__ptr; } // this is consistent with ObjCObject's API; internally objc can continue to access __ptr (as JS can't make that private in any case), but if client code needs to pass a raw SEL to e.g. ObjC's C-based runtime APIs it will need this raw pointer
+  
+  get [String.toStringTag]() { `Selector=${this.name}` }
 }
 
 module.exports = Selector;

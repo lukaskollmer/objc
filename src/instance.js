@@ -16,6 +16,7 @@ const converters = require('./type-converters'); // rename codecs?
 const Selector = require('./selector');
 const {InOutRef} = require('./inout');
 const Block = require('./block');
+const types = require('./types');
 
 
 let debugLog = function(){}
@@ -87,27 +88,7 @@ function wrapInstance(ptr) {
   return createMethodProxy(new ObjCInstance(getClassByPtr(runtime.object_getClass(ptr)), ptr));
 }
 
-// wrapping methods is a bit more involved, as we need to introspect their signatures and build an ffi.ForeignFunction to marshall arguments and results (plus, until objc.types.)
-
-function introspectMethod(object, methodName) {
-  // object : ObjCClass | ObjCInstance
-  // methodName : string -- JS-style method name, e.g. "foo_bar_"
-//  debugLog('introspect "'+methodName+'"')
-  try {
-    // sanity checks; TO DO: get rid of these once satisfied callers always pass correct argument types
-    if (!object instanceof ObjCObject || object[constants.__objcObject]) {
-      throw new TypeError(`introspectMethod expected an unwrapped ObjCObject but received ${typeof object}`);
-    }
-    if (!constants.isString(methodName)) {
-      throw new TypeError(`introspectMethod expected a string name but received ${typeof methodName}`);
-    }
-    let signature = encodings.introspectMethod(object, Selector.fromjs(methodName));
-    return signature;
-  } catch (e) {
-    e.message = `Cannot introspect ${String(object)} '${String(methodName)}' ${e}`;
-    throw e;
-  }
-}
+// wrapping methods is a bit more involved, as we need to introspect their signatures and build an ffi.ForeignFunction to marshall arguments and results; currently this logic is spread out between wrapMethod, type-encodings, and ref-napi
 
 
 function wrapMethod(objcObject, methodDefinition) {
@@ -162,7 +143,7 @@ debugLog('>>callObjCMethod: '+methodDefinition.selector.name)
         } else if (arg instanceof Buffer) {
           return arg; // we'll assume if user passes in a Buffer object, they know what they're doing and won't even try to type check or do anything with it (since it's just bytes, which could be anything under C's not-a-type system)
         }
-        // this switch is temporary; eventually this logic should migrate into individual ffi-compatible codec functions that can be passed directly to ffi.ForeignFunction(); see TODOs on the coerceType() calls in introspectMethod() above
+        // this switch is temporary; eventually this logic should migrate into individual ffi-compatible codec functions that can be passed directly to ffi.ForeignFunction(); see TODOs on the coerceType() calls in introspectMethod
         switch (expectedArgumentType[0]) {
       
         case '@': // ObjC instance // TO DO: is it possible/legal in ObjC for Class to be passed as an instance? (ObjC classes are themselves treatable as "objects", but this doesn't necessarily mean they are instances of Class [meta]class – ObjC's object abstractions are not as rigorous as Smalltalk’s and tend to spring leaks under pressure)
@@ -318,6 +299,8 @@ debugLog('>>callObjCMethod: '+methodDefinition.selector.name)
 
 // TO DO: ObjCInstance.tojs() should include ptr's hex address, to distinguish one instance from another
 
+// abstract base class; wraps a pointer to an ObjC class or instance
+
 class ObjCObject { // internal to objc, but can be accessed externally if required with standard caveat emptor
 
   constructor(ptr) {
@@ -334,7 +317,7 @@ class ObjCObject { // internal to objc, but can be accessed externally if requir
   }
   
   [Symbol.toString]() { // TO DO: this returns ObjC's description string, which might not be what we want, but let's see how it goes for now
-    return (this.cachedMethods['description'] || this.bindMethod(methodName)).UTF8String();
+    return this.callObjCMethod('description').UTF8String();
   } // TO DO: if more ObjCObject methods need to call ObjC methods, we can implement general `callMethod(methodName,...argv)` on ObjCClass and ObjCInstance, allowing them to be used without going through wrapper first (e.g. `this.callMethod('description').UTF8String()`)
   
   // TO DO: implement inspect on ObjCObjects?
@@ -343,7 +326,26 @@ class ObjCObject { // internal to objc, but can be accessed externally if requir
   // TO DO: what else needs [re]implemented on ObjCObjects and/or their method Proxy wrapper?
   
   // note that there is no need to reimplement the old `Instance.respondsToSelector()` as the user can test for any method's existence just by asking for it by name and trapping the resulting 'method not found' error (which should really be its own MethodNotFoundError subclass of Error, along with other objc errors); plus, of course, the NSObject protocol already guarantees native ObjC `respondsToSelector:` methods on all classes and instances
+  
+  [util.inspect.custom]() {
+    console.log('inspecting ObjCObject (constructor='+this.constructor.name+')'); return '<ObjCObject>'
+    if (this.constructor.name !== 'ObjClass' && this.constructor.name !== 'ObjInstance') { // and this is why Proxy can't just forward Symbol key lookups to the underlying ObjCObject - cos returning this method directly rebinds its `this` to the Proxy (which may or may not be the Proxy's well-intentioned doing, but a complete car crash either way)
+      console.log('\nBUG: util.inspect.custom - `this` should be ObjCClass/ObjCInstance but is '+this.constructor.name+'\n'+(new Error().stack)+'\n\n')
+    }
+    return this[Symbol.toString](); 
+  }
+  
+  callObjCMethod(name, ...argv) {
+    // an unwrapped ObjCObject can use this to call an ObjC method on itself (caution: external code should always use the method Proxy wrapper, not call callObjCMethod directly)
+    // name : string -- the method’s JS name, e.g. 'foo_bar_'
+    // argv : any -- any arguments to pass to the method
+    // Result: ObjCClass | ObjCInstance | null -- a method Proxy-wrapped ObjC object, or null (nil) (note: ObjC objects are not automatically converted back to JS types)
+    return (this.cachedMethods[name] || this.bindMethod(name))(...argv);
+  }
 }
+
+
+// concrete classes representing ObjC objects of types `Class` and `id`
 
 
 class ObjCClass extends ObjCObject {
@@ -359,6 +361,26 @@ class ObjCClass extends ObjCObject {
     // cache the signatures for the class's instance methods (the wrapped ObjC instance methods will be cached in the individual ObjCInstances)
     this.instanceMethodDefinitions = {};
     this.__name = runtime.class_getName(ptr);
+  }
+  
+  _introspectMethod(object, methodName) {
+    // object : ObjCClass | ObjCInstance
+    // methodName : string -- JS-style method name, e.g. "foo_bar_"
+  //  debugLog('introspect "'+methodName+'"')
+    try {
+      // sanity checks; TO DO: get rid of these once satisfied callers always pass correct argument types
+      if (!object instanceof ObjCObject || object[constants.__objcObject]) {
+        throw new TypeError(`ObjCClass._introspectMethod expected unwrapped ObjCObject but received ${typeof object}`);
+      }
+      if (!constants.isString(methodName)) {
+        throw new TypeError(`ObjCClass._introspectMethod expected string name but received ${typeof methodName}`);
+      }
+      let signature = encodings.introspectMethod(object, Selector.fromjs(methodName));
+      return signature;
+    } catch (e) {
+      e.message = `Cannot introspect ${String(object)} '${String(methodName)}' ${e}`;
+      throw e;
+    }
   }
   
   get name() {
@@ -377,13 +399,13 @@ class ObjCClass extends ObjCObject {
     return hint === 'number' ? Number.NaN : `[ObjCClass: ${this.name}]`; // TO DO: how to represent a class? a parenthesized literal expression might be best, e.g. `(objc.NSString)`, as it is both self-descriptive and can-be copy+pasted+evaluated to recreate it; however, that doesn't work so well with instances, where we'd need to replicate the constructor and arguments as literals as well (we might eventually do that for the bridged Foundation types, but anything else is probably best using the ObjC description string)
   }
   
-  objcMethodPtr(selector) { // looks up and returns the C pointer to the specified class method; used by introspectMethod()
+  objcMethodPtr(selector) { // looks up and returns the C pointer to the specified class method; used by introspectMethod
     return runtime.class_getClassMethod(this.__ptr, selector.__ptr);
   }
   
   bindMethod(methodName) { // create a wrapper for the named ObjC class method and bind it to this ObjClass
     // note: this is  called by method Proxy wrapper, once for each class method used
-    let methodDefinition = introspectMethod(this, methodName);
+    let methodDefinition = this._introspectMethod(this, methodName);
     let method = wrapMethod(this, methodDefinition);
     this.cachedMethods[methodName] = method;
     return method;
@@ -392,7 +414,7 @@ class ObjCClass extends ObjCObject {
   bindInstanceMethod(instanceObject, methodName) { // this is called once for each instance method
     let methodDefinition = this.instanceMethodDefinitions[methodName];
     if (!methodDefinition) {
-      methodDefinition = introspectMethod(instanceObject, methodName);
+      methodDefinition = this._introspectMethod(instanceObject, methodName);
       this.instanceMethodDefinitions[methodName] = methodDefinition;
     }
     return wrapMethod(instanceObject, methodDefinition);
@@ -468,19 +490,39 @@ function createMethodProxy(obj) {
   //
   // As a rule, client code should not need to access the underlying ObjCObject or ObjC pointer, except when working with ffi directly, e.g. when calling a C function that takes a `Class` or `id` argument (i.e. the underlying ObjC pointer); it is also possible to call CoreFoundation functions passing a toll-free-bridged ObjC pointer where a CFTYPERef is expected, caveat ownership remains with ObjC's ARC (transferring ObjC object ownership to/from CF's manual refcounting is left as an exercise to brave/expert/foolhardy readers)
   //
-  return new Proxy(obj, { // no way to customize Proxy's name, unfortunately, or we'd call this MethodProxy so that it's easy to identify in stack traces
+  if (!(obj instanceof ObjCObject)) {
+    throw new Error(`createMethodProxy expected an ObjCObject but received ${typeof obj}: ${String(obj)}`);
+  }
+  return new Proxy(obj, { // note: no way to customize the Proxy's name, unfortunately, or we'd name it MethodProxy so that it's easy to identify in stack traces
     get: function (objcObject, methodName, proxyObject) {
       
-//       console.log(`method Proxy is looking up ${typeof methodName}: ${String(methodName)}…`);
+//      console.log(`method Proxy is looking up ${typeof methodName}: ${String(methodName)}…`);
       
-      if (!(objcObject instanceof ObjCObject)) {
-        throw new Error(`method Proxy expected ObjCObject but received ${typeof objcObject}: ${objcObject}`);
-      }
       // 1. see if there's already a method wrapper by this name (this also handles __objcClassPtr/__objcInstancePtr)
       let method = objcObject.cachedMethods[methodName];
 //      debugLog('getting method: `'+String(methodName)+'`: '+typeof method);
       // note: method = null for __objcClassPtr key if objcObject is ObjCInstance, or null for __objcInstancePtr key if objcObject is ObjCClass; for any other key, it will be a function or undefined (this allows __objcTYPEPtr lookups to bypass the switch block below, and it's slightly simpler to put those 2 keys in cachedMethods than in switch block)
       if (method === undefined) {
+        
+        
+        
+        /* TO DO: this is proper weird bug:
+        
+        Error: FUBAR
+          at Object.get (/Users/has/dev/javascript/objc/src/instance.js:602:77)
+          at Proxy.[nodejs.util.inspect.custom] (/Users/has/dev/javascript/objc/src/instance.js:347:40)
+          at formatValue (node:internal/util/inspect:763:19)
+          at inspect (node:internal/util/inspect:340:10)
+          at formatWithOptionsInternal (node:internal/util/inspect:2006:40)
+          at formatWithOptions (node:internal/util/inspect:1888:10)
+          at console.value (node:internal/console/constructor:323:14)
+          at console.log (node:internal/console/constructor:359:61)
+          at AppData.pack (/Users/has/dev/javascript/nodeautomation/lib/aeappdata.js:890:14)
+          at Object.packObjectSpecifier [as pack] (/Users/has/dev/javascript/nodeautomation/lib/aeselectors.js:71:44)
+        */
+        if (methodName === 'function toString() { [native code] }') { throw new Error('FUBAR') }
+
+        
         
         debugLog('…method not found, so SWITCH on special keys…')
         
@@ -503,6 +545,9 @@ function createMethodProxy(obj) {
           debugLog(`Warning: getting deprecated ${methodName} property on method Proxy`);
           return objcObject.cachedMethods[methodName];
         
+        case 'constructor':
+          console.log('BUG: looking up "constructor" on method Proxy\n'+(new Error().stack)+'\n\n')
+          break;
         
         // inspection/coercion
         
@@ -595,11 +640,9 @@ try {
         }
         
         // 3. anything else is either an unsupported Symbol key or a string, which is assumed to be the name of an ObjC method which has not previously been used so will be looked up (and also cached for resuse) now
-        
         if (!constants.isString(methodName)) { // TO DO: forward all symbol key lookups to underlying ObjCObject? (need to check who owns `this`; also, above switch block may still want/need to handle symbol keys itself)
-        
-          return objcObject[methodName];
-          // tentatively, in order to reduce size of/eliminate entirely the above switch: if methodName is not a string (i.e. it's a symbol), could do lookup of objcObject[methodName] here, and if its value is a function then wrap it in a closure `() => objcObject[methodName](...arguments)` so that we don't have to worry about `this`, else return that result (which may be undefined - i.e. not found - or the property's value)
+     //   return objcObject[methodName]
+          return undefined; // we can't just return objcObject[methodName] as those methods' `this` appears to rebind to Proxy, resulting in incorrect behavior
 //          debugLog("proxy did not find ${String(methodName)}")
 //          return undefined; // if methodName is a symbol, it can't be an ObjC method, and it's not one of the known special keys, so return it // caution: nodeautomation (and probably other libraries) check for object.NAME returning undefined as part of their type checking/internal access, so throwing here will break their assumption that non-existent = undefined
         }
@@ -648,4 +691,7 @@ module.exports = {
   isWrappedObjCInstance,
   keyObjCObject: constants.__objcObject, // symbol key for extracting an ObjCObject from its method Proxy wrapper
   runtime,
+  types,
+  
+  [util.inspect.custom]: (depth, inspectOptions, inspect) => '[object objc.__internal__]',
 };

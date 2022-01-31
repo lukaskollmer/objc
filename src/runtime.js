@@ -1,5 +1,7 @@
 /* eslint-disable camelcase, key-spacing, no-multi-spaces, array-bracket-spacing */
 
+const util = require('util');
+
 const ffi = require('ffi-napi');
 const ref = require('ref-napi');
 
@@ -126,3 +128,6 @@ module.exports.classExists = classExists;
 module.exports.getSymbol = getSymbol;
 module.exports.getSymbolAsId = getSymbolAsId;
 module.exports.swizzle = swizzle;
+
+module.exports[util.inspect.custom] = () => '[object objc.__internal__.runtime]'; // TO DO: crude, but any user sufficiently advanced to perform this magic this had best read the module source and corresponding ObjC documentation
+

@@ -2,6 +2,10 @@
 
 // as with Block and create-class, it may be possible to consolidate the APIs for constructing signatures; bear in mind that .bridgesupport support (if implemented) would also use this (for now, non-introspectable [non-ObjC] APIs must be manually bridged, including all CoreFoundation-based APIs [most of CF's own functionality is already natively accessible in Foundation, but some parts aren't and some modern OS APIs are C-based so use CF types rather than Foundation equivalents])
 
+
+// TO DO: [util.inspect.custom]
+
+
 const ref = require('ref-napi')
 const struct = require('ref-struct-di')(ref); // the ref APIs' logic is not easy to follow; it suggests the struct module can be parameterized with custom types, and over in ./types.js we extend the standard ref-napi (C) types with familiar ObjC types, but that isn't passed here so presumably structs don't have access?
 
