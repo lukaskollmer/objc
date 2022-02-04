@@ -1,5 +1,7 @@
-const objc = require('../');
-const path = '/Users/lukas/Library/Developer/Xcode/DerivedData/test_LKFramework-cegmgngjjlcdtkewahzbxzzgxchq/Build/Products/Debug/LKFramework.framework';
+#!/usr/bin/env node
+
+const objc = require('../src/index');
+const path = '/Users/lukas/Library/Developer/Xcode/DerivedData/test_LKFramework-cegmgngjjlcdtkewahzbxzzgxchq/Build/Products/Debug/LKFramework.framework'; // TO DO
 
 objc.import(path);
 

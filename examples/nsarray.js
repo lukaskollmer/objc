@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 'use strict';
 
 const objc = require('../src/index');
@@ -41,8 +43,8 @@ for (let str of array) {
 // Sort using block
 
 var block = new objc.Block((arg1, arg2) => {
-	arg1 = objc.wrap(arg1);
-	arg2 = objc.wrap(arg2);
+	arg1 = objc.__internal__.wrap(arg1);
+	arg2 = objc.__internal__.wrap(arg2);
 	return arg1.length() < arg2.length() ? -1 : 1;
 }, 'q', ['@', '@']);
 

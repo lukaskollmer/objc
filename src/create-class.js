@@ -1,6 +1,17 @@
+// TO DO: rename `subclass`
+//
+// TO DO: this API needs more thought
+//
+// the goal is to make JS classes callable from ObjC, but this API is not elegant and is not integrated with new instance.js implementation, so it won't add newly created classes to the `objc` namespace
+//
+// in an ideal world, users would write `class Foo extends objc.NSObject {…}` but really not sure if that's technically feasible (at minimum, the resulting Foo class would need explicitly passed to an `objc.registerAsObjCClass()` to register it with objc's Class cache (or can we do that during first instantiation, when JS presumably calls JS class's parent's constructor?)
+//
+// during class registration, we should be able to introspect it for methods, relying on '$NAME' vs 'NAME' to distinguish class ("$tatic") methods from instance methods; however, we'd still need a way to annotate each JS method with an ObjC type signature, so will need more thought
+
+
 const runtime = require('./runtime');
 const Block = require('./block');
-const {wrapClass} = require('./instance');
+const instance = require('./instance');
 
 
 
@@ -27,29 +38,20 @@ const addMethods = (dest, methods) => {
 };
 
 
-
-// TO DO: this needs redone; the goal, obviously, is to make JS classes callable from ObjC, but this is neither elegant nor integrated with new instance.js implementation so doesn't add the newly created classes to the `objc` namespace; in an ideal world, client would write `class Foo extends objc.NSObject {…}` but really not sure if that's technically feasible (at minimum, Foo class would need passed to an explicit `objc.registerAsObjCClass()`, which could introspect it for methods, using `$NAME(){…}` vs `NAME(){…}` to distinguish class vs instance methods, and add it to the class cache)
-
-
 module.exports = (name, superclass, instanceMethods = {}, classMethods = {}) => {
-  // ObjC runtime requires each class name to be unique
-  // Q. what does ObjC runtime do if a framework is imported that causes a class name collision?
+  
+  // note: use objc.NAME to get the newly created class 
+  // caution: ObjC runtime requires each class name to be unique
   if (runtime.classExists(name)) {
     throw new Error(`Can't create class ${name} as it already exists.`);
   }
-  // Assuming superclass is a string
+  // Assuming superclass is a string // TO DO: why? why not use objc.CLASS and extract ptr from that?
   superclass = runtime.objc_getClass(superclass);
 
-  const classPtr = runtime.objc_allocateClassPair(superclass, name, 0); // TODO add ivar support?
-
-  // Add instance methods
+  const classPtr = runtime.objc_allocateClassPair(superclass, name, 0); // TODO add ivar support? -- Q. for what purpose? anyone subclassing ObjC classes probably shouldn't be poking in their ivars as those are normally undocumented and may be considered private to the superclass (this could be troublesome if creating JS subclass of JS subclass of ObjC class, if the JS sub-subclass needs to access the JS subclass's attributes; but probably best to leave until final syntax/API for declaring ObjC subclasses in JS - ideally using ES6 class syntax - is figured out)
+  
   addMethods(classPtr, instanceMethods);
-
   runtime.objc_registerClassPair(classPtr);
-
-  // Add class methods
   addMethods(runtime.object_getClass(classPtr), classMethods);
-
-  // Return a proxy wrapping the newly created class
-  return wrapClass(classPtr); // TO DO: this doesn't cache the class in instance.js
+  // HAS: don't return the new ObjC class here as that suggests it is locally scoped to the module that created it, whereas all ObjC classes exist globally and are always available as objc.CLASSNAME
 };

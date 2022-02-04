@@ -2,7 +2,7 @@
 
 // TO DO: `console.log(objc)` returns recursive inspection of the Proxy's target object, which is probably not what we (or users) want; however, [util.inspect.custom] doesn't seem to work regardless of where we put it (I think, ideally, util.inspect should, by default, list the names (and maybe types) of builtins, followed by names of any already-bound ObjC classes and constants); with the option to pass a flag in options object to get a full (default) list
 //
-// for now, we limit display of objc.types to keys only and of objc.__internal__.runtime to '[object TYPE]' string
+// for now, we limit inspection string for objc.__internal__ (which most users shouldn’t need) to "[object objc.__internal__]", keeping `console.log(objc)` representation reasonably clean
 
 const util = require('util');
 
@@ -11,7 +11,7 @@ const types = require('./types');
 const runtime = require('./runtime');
 const instance = require('./instance');
 const {js, ns} = require('./type-converters');
-const {InOutRef} = require('./inout.js');
+const InOutRef = require('./inout.js');
 const Block = require('./block');
 const Selector = require('./selector');
 const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
@@ -31,7 +31,7 @@ const importFramework = name => {
   if (!bundle.load()) { // TO DO: it would be better to use loadAndReturnError:(NSError**), to provide better error messages
     throw new Error(`Unable to load bundle named '${name}'`);
   }
-  return bundle; // TO DO: confirm this; we probably should return the bundle itself, in case callers want to load nib or other resource files as well
+  return bundle; // think we should return the bundle itself, in case callers want to load resource files from the bundle as well
 };
 
 
@@ -40,18 +40,19 @@ module.exports = new Proxy({
   // TO DO: there's a risk in principle of builtin names masking importable names; do we really need to worry about that in practice though, given that [Obj]C strongly encourages framework devs to prefix all exported names with an ad-hoc namespace (e.g. "NSBlock", not, "Block")? if name masking is a concern, we could use `$NAME` to disambiguate imported names; stripping the leading '$' when doing the actual lookup
     
   // import frameworks
-  import: importFramework, // TO DO: is it worth allowing multiple frameworks to be imported in a single `import()`, as a convenience to users? e.g.: objc.import('AppKit', 'CoreData', 'WebKit')
+  import: importFramework,
+  
   // explicitly convert values between ObjC and JS types
   js,
   ns,
   
-  // type checking (note: users should use these functions to identify ObjC objects rather than e.g. `object instanceof objc.__internal__.ObjCInstance`, unless they really understand what they're doing)
-  isObject: (object) => object && object[constants.__objcObject] !== undefined,
+  // type checking (note: users should use these functions to identify ObjC objects, not `instanceof` which won't check for method Proxy wrapper)
+  isObject: instance.isWrappedObjCObject,
   isClass: instance.isWrappedObjCClass,
   isInstance: instance.isWrappedObjCInstance,
   
   // creating ObjC-specific types
-  // note: use objc.__internal__.types to access napi-ref-compatible type objects currently used by Block, Selector, etc (moving it there reduces top-level noise in objc namespace, and it is lower-level technical stuff for use in ffi-napi); TO DO: if/when .bridgesupport is implemented, users should almost never need to define Struct types, or C function or Block argument/result types manually (create-class might still use it); FWIW, once ObjC type encoding parser can read full signatures, we should probably just use for user-defined Structs, Blocks, NSObject subclasses too (the overhead of parsing those strings into ref-napi types will be minimal and ObjC type strings are probably easier to write than ref-napi code)
+  // note: use objc.__internal__.types to access napi-ref-compatible type objects currently used by Block, Selector, etc (moving it there reduces top-level noise in objc namespace, and it is lower-level technical stuff for use in ffi-napi); TO DO: if/when .bridgesupport is implemented, users should almost never need to define Struct types, or C function or Block argument/result types manually (hence `objc.__internal__.types`, not `objc.types`, in anticipation of this); FWIW, once ObjC type encoding parser can read full signatures, we should probably just use that for user-defined Structs, Blocks, NSObject subclasses too: the overhead of parsing those strings into ref-napi types will be minimal and ObjC type strings are probably easier to write than ref-napi code
   Block,
   InOutRef,
   Selector,

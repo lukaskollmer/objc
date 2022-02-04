@@ -7,7 +7,7 @@ module.exports = {
   // use these functions to typecheck JS values
   // (annoyingly JS allows `new TYPE(primitive)` for creating object-based booleans, numbers, and strings, so both primitive and object versions must be accounted for; why JS doesn't define these as standard...yada,yada)
   isBoolean: object => (typeof object === 'boolean' || object instanceof Boolean),
-  isNumber:  object => (typeof object === 'number' || object instanceof Number), // note: this does not check isNaN(); this is intentional (NaN's type is still 'number', and it's part of the IEEE spec for FP numbers, so will still map to and from NSNumber)
+  isNumber:  object => (typeof object === 'number' || object instanceof Number), // note: this does not check isNaN(); this is intentional (NaN's type is still 'number', and it's part of the IEEE spec for FP numbers, so will still map to and from NSNumber which is all we're interested in)
   isString:  object => (typeof object === 'string' || object instanceof String),
   
   // keys for externally accessing method Proxy's internal objects; used throughout objc and may occasionally be needed by client code when working with C functions (which objc does not currently generate wrappers for)

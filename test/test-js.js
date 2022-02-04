@@ -30,20 +30,27 @@ Error: BUG: ObjCClass[Symbol.toPrimitive] thinks 'this' is a method Proxy, not i
 
 console.log(`class representation: '${objc.NSString}'`) // "[ObjCClass: NSString]" -- this is currently returned by ObjCClass.tojs()
 
+/*
 //console.log(Boolean) // [Function: Boolean]
 class Foo extends Array {}
 console.log(Foo) // [class Foo extends Array]
 class Bar {}
 console.log(Bar) // [class Bar]
-
+*/
 
 // console.log(objc.NSData.data()) // this needs workΩ as it's returning a raw inspection string of the ObjCInstance and its contents, which is NOT what we want to display
 
-let s = objc.NSString.stringWithString_('a test string')
+let s = objc.NSString.stringWithString_('This is a test string.')
 
 // console.log(s) // this is raw inspect string (eventually we should implement [util.inspect.custom] methods that return a shorter, neater,friendlier representation)
 
-console.log(`${s}`) // 'a test string'
+console.log()
+console.log(s) // [objc: This is a test string.]
+console.log()
+console.log(`${s}`) // This is a test string.
+console.log()
+console.log(String(s)) // This is a test string.
+console.log()
 
 
 
@@ -58,6 +65,11 @@ v = objc.ns(v)
 v.addObject_(objc.NSAppleScriptErrorAppName)
 
 console.log('v is ObjC instance = '+objc.isInstance(v))
-console.log(`test-js: instance representation = '${v}'`) // "[ObjCInstance NSString]"
+
+// util.inspect uses hybrid representation: a JS-style "[objc:...]" containing ObjC description string
+console.log(`ObjCInstance inspect:`, v) // ObjCInstance inspect: [objc: ( 44,NSAppleScriptErrorAppName )]
+
+// toString uses JS-style representation
+console.log(`ObjCInstance toString: '${v}'`) // ObjCInstance toString: '44,NSAppleScriptErrorAppName'
 
 

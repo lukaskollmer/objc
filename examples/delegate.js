@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const objc = require('../src/index');
 
 const {
@@ -8,9 +10,10 @@ const {
 
 
 
-const FileManagerDelegate = objc.createClass('FileManagerDelegate', 'NSObject', {
+// the newly created ObjC class is available as `objc.FileManagerDelegate`
+objc.createClass('FileManagerDelegate', 'NSObject', {
   'fileManager:shouldMoveItemAtPath:toPath:': (self, cmd, fileManager, srcPath, dstPath) => {
-    console.log('-[NSFileManagerDelegate fileManager:shouldMoveItemAtPath:toPath:]');
+    console.log('calling: -[NSFileManagerDelegate fileManager:shouldMoveItemAtPath:toPath:]');
     return 1;
   },
 
@@ -23,15 +26,15 @@ const FileManagerDelegate = objc.createClass('FileManagerDelegate', 'NSObject', 
 
 
 const fm = NSFileManager.new();
-const delegate = FileManagerDelegate.new();
+const delegate = objc.FileManagerDelegate.new();
 fm.setDelegate_(delegate);
 
 
 const pathA = 'x.txt';
 const pathB = 'y.txt';
 
-// create file
 
+// create file
 const data = objc.ns('hello world').dataUsingEncoding_(4);
 fm.createFileAtPath_contents_attributes_(pathA, data, null);
 
