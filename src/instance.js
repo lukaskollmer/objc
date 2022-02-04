@@ -324,9 +324,12 @@ class ObjCObject { // internal to objc, but can be accessed externally if requir
   
   [util.inspect.custom]() {
     // console.log('inspecting ObjCObject (constructor='+this.constructor.name+')'); // caution: you'd think the constructor here would be ObjCClass/ObjCInstance, but no: it's Object, the Proxy wrapper which is now bound to `this`
-    // TO DO: annoyingly, when util.inspect() is passed the method Proxy, the Proxy's 'get' handler does not intercept the util.inspect.custom key lookup but instead passes it directly to the ObjCObject; therefore, to return a custom inspection string, we have to implement the util.inspect.custom behavior here. But wait, there's more! Just to further confuse, when this inspection method is invoked, its `this` is actually the Proxy, not the ObjCObject, so we have to go back through the Proxy again in order to call the method we actually want, which is `description`.
+    // TO DO: annoyingly, when util.inspect() is passed the method Proxy, the Proxy's 'get' handler does not intercept the util.inspect.custom key lookup but instead passes it directly to the ObjCObject; therefore, to return a custom inspection string, we have to implement the util.inspect.custom behavior here. But wait, there's more! Just to further confuse, when this inspection method is invoked, its `this` is actually the Proxy, not the ObjCObject, so we have to go back through the Proxy again in order to call the method we actually want, which is `ObjCObject.__callObjCMethod__`, which calls `[NSObject description]` to get the object's ObjC description string.
+    //
+    // ...and then sometimes it doesn't, as `this` appears to change identity between the Proxy wrapper and the ObjCObject depending on who is calling this method from where (calling through the method wrapper, the Proxy becomes the proxied object's `this` [counterituitive, but probably a special Proxy behavior that's intended]; whereas displaying the returned object in the REPL, `this` is the ObjCObject itself [what would normally be expected]).
+    //
     // note: since ObjC descriptions for NSArray, NSDescription, etc traditionally extend over multiple lines, this collapses all whitespace into single spaces to improve density and maintain consistency with JS's traditional bracket notation (toString still returns the original representation)
-    return `[objc: ${this.description().UTF8String().replace(/\s+/g, ' ')}]`; // this.__callObjCMethod__('description').UTF8String();
+    return `[objc: ${this.__callObjCMethod__('description').UTF8String().replace(/\s+/g, ' ')}]`;
   }
   
   __callObjCMethod__(name, ...argv) {
