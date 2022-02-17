@@ -93,8 +93,9 @@ const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: 
 
 
 
+// TO DO: inline everything, working directly with ObjC ptrs, and apply single wrapper at end (the wrapper can be omitted when packing for use in objc_instance_t.set, which only needs the ptr)
 
-const ns = (object, resultIfUnconverted = nsThrowIfUnconverted) => {
+const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnWrappedObject = true) => {
   let retvalue;
   
 //let t = process.hrtime.bigint();
@@ -137,11 +138,14 @@ const ns = (object, resultIfUnconverted = nsThrowIfUnconverted) => {
     // note: PyObjC seems to treat NSNumber.numberWithBool_ calls as a special case, as it returns a native True/False rather than, say, a <class 'objc.pyobjc_bool'> (I suspect that since a bool->NSNumber conversion is inherently cheap, PyObjC just leaves it until it's packing the arguments for objc_msgSend)
     
   } else {
-    retvalue = typeof resultIfUnconverted === 'function' ? resultIfUnconverted(object) : resultIfUnconverted;    
+    return typeof resultIfUnconverted === 'function' ? resultIfUnconverted(object) : resultIfUnconverted;    
   }
   
 //console.log(`ns(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
-
+  
+  // for now, unwrap the object to return ptr; once the above code works with ptrs, reverse the logic to add wrapper
+  if (!returnWrappedObject) { retvalue = retvalue[constants.__objcObject].ptr; }
+  
   return retvalue;
 };
 

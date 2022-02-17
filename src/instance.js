@@ -8,19 +8,19 @@
 
 // TO DO: dividing the original Instance backing store into separate ObjCClass and ObjCInstance facilitates caching of class and instance methods, but need to make sure this doesn't cause any problems where ObjC treats Class and id pointers interchangeably
 
+// TO DO: there is circular reference between instance and objctypes (instance currently imports objctypes.introspectMethod on first use)
+
+const util = require('util');
 
 const ffi = require('ffi-napi');
 const ref = require('ref-napi');
-const util = require('util');
 
 const constants = require('./constants'); 
 const runtime = require('./runtime');
-const encodings = require('./type-encodings');
-const converters = require('./type-converters');
+const {js} = require('./codecs'); // used in toPrimitive
 const Selector = require('./selector');
-const InOutRef = require('./inout');
+const ObjCRef = require('./objcref');
 const Block = require('./block');
-const types = require('./types');
 
 
 /******************************************************************************/
@@ -88,199 +88,50 @@ const wrapInstance = ptr => {
   return createMethodProxy(new ObjCInstance(getClassByPtr(runtime.object_getClass(ptr)), ptr));
 }
 
-
-// wrapping methods is a bit more involved, as we need to introspect their signatures and build an ffi.ForeignFunction to marshall arguments and results; currently this logic is spread out between wrapMethod, type-encodings, and ref-napi
-
-
 const wrapMethod = (objcObject, methodDefinition) => {
   // create a method wrapper bound to a ObjCClass/ObjCInstance
   // objcObject : ObjCObject -- the ObjCClass/ObjCInstance to which this method belongs
-  // methodDefinition : object -- {selector, argc, argumentTypes, returnType, msgSend}
+  // methodDefinition : object -- see introspectMethod
   // Result: function -- the "method" function that the client code will call, e.g. `NSString.stringWithString_`
   //
-  // note: assuming that processing argument and return values can be moved entirely into codecs for ffi.ForeignFunction, the following lengthy closure is replaced with a single line: 
+  // for efficiency, returned NSString, NSArray, etc are not automatically converted back to JS values, as we have know way of knowing if caller will pass them to another ObjC method, or wants to use them in JS now (if caller specifically wants a JS value back, they need to wrap the method call in a js() function, and likewise apply js() to any out arguments)
   //
-  //  return (...argv) => methodDefinition.msgSend(objcObject.__ptr, methodDefinition.selector.__ptr, ...argv);
-  //
-  // in practice we probably want to wrap this in a try…catch… that generates a user-friendly description of any argument type errors that occur (i.e. object description, method name, and index and value of the bar argument)
+  // TO DO: this doesn't support varargs
   //
   // TO DO: somewhat annoyingly, the callObjCMethod function shows as "Proxy.callObjCMethod" in Error call stacks; ideally we want it to show as "NSFoo.bar_baz_" (note also that the Proxy appears to become the function's `this` upon its return from Proxy's `get` handler, which is just typical JS)
   //
-  return function callObjCMethod(...argv) { // naming this function makes stack traces so much easier to read; TO DO: ideally we'd set the function name dynamically, though that's a bit fiddly (a compromise might be to provide a custom inspect/toPrimitive string, possibly based on its signature so user can see argument and return types)
-    // argv : any -- the arguments passed by the caller, which must match the number and types of arguments expected by the ObjC method; if the wrong number or type of arguments is given, an error is thrown (bearing in mind that this treats all ObjC instances as type `id`; thus it's still possible to pass e.g. an NSArray where an NSString is expected, in which case the ObjC runtime and/or receiving method will let you know you've screwed up [or might not, since ObjC error reporting is marvelously vague and largely reliant on explicit nil checks])
-
-    //let t = process.hrtime.bigint()
-
+  return function callObjCMethod(...args) { // ideally closure would be named after methodDefinition.methodName, but that's tricky; TO DO: we probably could attach a custom inspect that will display method name and argument types
     //console.log('>>callObjCMethod: '+methodDefinition.selector.name)
-
+    //let t = process.hrtime.bigint()
     try {
-      
-      // TO DO: this doesn't support varargs (and TBH, not sure if/how it can/should)
-      if (argv.length != methodDefinition.argc - 2) {
-        throw new Error(`Expected ${methodDefinition.argc - 2} arguments but received: ${argv.length}`);
+      let retval = methodDefinition.msgSend(objcObject.ptr, methodDefinition.sel, ...args);
+      // update any inout/out arguments (ObjCRefType.set attached before and after pointers and type info)
+      if (methodDefinition.inoutIndexes) {
+        for (let i of methodDefinition.inoutIndexes) {
+          const box = args[i];
+          if (box instanceof ObjCRef && !box.__outptr.equals(box.__inptr)) {
+            // box.__outptr.readPointer().isNull() // TO DO: do we need a NULL check here?
+            box.value = box.__reftype.get(box.__outptr, 0, box.__reftype);
+          }
+        }
       }
-  
-      // TO DO: fairly sure we can enforce ^@ args must be InOutRef
-  
-      const inoutArgs = []; // Indices of inout args (ie `NSError **`); after call, these args will be iterated and their contents updated
-
-      const args = argv.map((arg, idx) => {
-        idx += 2; // first 2 arguments to msgSend are always the ObjC object and selector
-        const expectedArgumentType = methodDefinition.argumentTypes[idx];
-      
-        // TO DO:it  would be better to define packTYPE and unpackTYPE functions corresponding to the various ObjC types (presumably ffi already defines codec functions for all of the C primitive types), in which case we can replace the string-based argumentTypes and resultType with codec functions that dynamically typecheck the given argument and convert it to the appropriate ffi type; this eliminates the if/else statements below, especially if it integrates with the existing ForeignFunction codecs rather than being an extra layer atop it as this is (i.e. except for inouts, we wouldn't have to do much, if any, processing of argument and return values here, just invoke msgSend directly with argv and return its result directly); and even inout args will be supported by ffi-ref so we should be able to discard our custom InOutRef and just re-export ffi's existing wrapper
-        // TO DO: read ref-napi and ffi-napi docs docs
-      
-  //console.log(`Packing argument ${idx}: ${typeof arg} '${arg}'`)
-    
-        // TO DO: *always* crosscheck the argument's given value with its expected type and throw if there's a mismatch (e.g. what happens if JS null is passed where an int/float is expected? will FFI automatically convert null to 0/0.0, and even if it does is it wise to allow that?) need to get list of all ObjC argument/result type codes, including for C primitives (bool/char, ints and floats of various sizes, pointers), and also check how void results are returned
-      
-        // see ObjC runtime encoding types
-        // see also: https://ko9.org/posts/encode-types/
-      
-        // straight off the bat, always reject undefined in the argument list
-        if (arg === undefined) {
-          throw new Error(`Expected a value for argument ${idx - 1} but received: undefined`);
-        } else if (arg instanceof Buffer) {
-          return arg; // we'll assume if user passes in a Buffer object, they know what they're doing and won't even try to type check or do anything with it (since it's just bytes, which could be anything under C's not-a-type system)
-        }
-        // this switch is temporary; eventually this logic should migrate into individual ffi-compatible codec functions that can be passed directly to ffi.ForeignFunction(); see TODOs on the coerceType() calls in introspectMethod
-        switch (expectedArgumentType[0]) {
-      
-        case '@': // ObjC instance // TO DO: is it possible/legal in ObjC for Class to be passed as an instance? (ObjC classes are themselves treatable as "objects", but this doesn't necessarily mean they are instances of Class [meta]class – ObjC's object abstractions are not as rigorous as Smalltalk’s and tend to spring leaks under pressure)
-          if (arg === null) { // TO DO: how should undefined be treated? as an argument type error or, like null, as ObjC nil?
-            return null; // `nil`
-          } else if (expectedArgumentType[1] === '?') { // block signature is always '@?', according to URL above; TO DO: can block args be nil? (probably)
-            if (!(arg instanceof Block)) { // unfortunately we can't currently accept a JS function here as method introspection cannot tell us the block's exact signature (the block signature's might be available in .bridgesupport, in which case a function could be accepted for methods where that is available; PyObjC's .h parser presumably also can provide this information)
-              throw new Error(`Expected Block or null but received ${typeof arg}: ${arg}`);
-            }
-            return arg.makeBlock(); // rename this method (it is analogous to obj.__ptr)
-          
-          } else {
-            let obj = arg[constants.__objcObject]; // reminder: while booleans, numbers, strings and objects will return undefined here, null/undefined would error so must be dealt with above
-            if (obj === undefined) { // it's a JS value, so needs converted to ObjC object ptr; for now, just use ns() and then extract ptr from the resulting wrapper, but that can be streamlined later
-              return converters.ns(arg)[constants.__objcObject].__ptr; // TO DO: ns() currently returns null if arg can't be converted to ObjCObject then this will throw 'TypeError: Cannot read properties of null'; see TODO in ns() about throwing on unconvertible values; also, if ns() in future were to support JS->ObjCClass conversions, the converted value would need to be typechecked as instanceof ObjCInstance, same as above (in practice, we almost certainly don't want it to support any JS->ObjCClass conversions, as while Object, Array, Date, String, Number, Boolean could, in principle be mapped to their NSEquivalents, APIs that actually take Class args are rare, and we'd be creating extra work to make those ObjClasses’ behavior transparent with their JS equivalents; i.e. the amount of errors it could cause would far exceed any convenience) // BTW, calling ns() for argument packing is a temporary stopgap until ForeignFunction-compatible ObjC codec functions are done
-            } else { // it's an ObjCObject, so will need unwrapped
-              //if (!(obj instanceof ObjCInstance)) { // TO DO: is it legal in ObjC to pass `Class` where `id` is expected? I’m guessing not, hence this check // nope, totally wrong: ObjC's object system is remarkably well implemented and ObjC Class objects are themselves ObjC instances too, and can pass through APIs typed as either `Class` or `id`
-              //  throw new Error(`Expected ObjC instance (or JS equivalent) or null but received ${typeof arg}: ${arg}`);
-              //}
-              return obj.__ptr;
-            }
-          }
-        
-        case '#': // Class
-          if (arg === null) { // TO DO: can Class arguments be nil? probably, as they're just a pointer, but need to check
-            return null; // `nil`
-          } else {
-            let ptr = arg[constants.__objcClassPtr];
-            if (ptr === undefined || ptr === null) {
-              // TO DO: currently there is no mapping from a JS class to an ObjC class (see TODOs on create-class), but if there was then ns() might in future support it
-              //obj = ns(obj); 
-              //if (!obj instanceof ObjClass) {
-            
-                throw new Error(`Expected ObjC class or null but received ${typeof arg}: ${util.inspect(arg)}`);
-              //}
-            }
-            return ptr;
-          }
-        
-        case ':': // SEL        
-          return runtime.sel_getUid(String(arg)); // (note: if selector isn't already defined, sel_getUid creates it)
-        
-        case '^':
-          // e.g. '^@' is commonly used for inout arguments where an object is returned (NSError**), but other inout types are possible
-          if (arg === null) { // passing in null instead of an InOutRef means that caller is ignoring this argument; e.g. ObjC inout args typically allow nil to be passed (of course, if the ObjC method itself requires the argument to be non-nil then this will most likely blow up there)
-            return null;
-          } else {
-            //console.log(`  packing '${expectedArgumentType}' argument: ${arg instanceof InOutRef} '${arg}'`);
-            if (!(arg instanceof InOutRef || arg instanceof Buffer)) { // can InOutRef be replaced with standard ref.alloc(TYPE)? caveat we want to save client code specifying the exact type, which I think ref.alloc() requires (solution might be to put InOutRef behind a objc.types.alloc() function which, like InOutRef, doesn't need to know the type in advance as that will be decided here where argument's type is known)
-              throw new Error(`Expected InOutRef, Buffer, or null but received ${typeof arg}: ${arg}`);
-            }
-            switch (expectedArgumentType) { // TO DO: temporary till we finish ref-compatible ObjC codecs
-            case '^@': // `id*`; e.g. NSError**
-              const inoutType = ref.refType(ref.refType(ref.types.void));
-              let ptr, obj = arg.__object;
-              if (obj === null || obj === undefined) { // out only
-                ptr = ref.alloc(inoutType, null);
-              } else { // inout (the 'in' value may be replaced within InOutRef; the value itself is *not* mutated)
-                obj = obj[constants.__objcObject] || converters.ns(obj)[constants.__objcObject];
-                if (obj === undefined) {
-                  throw new Error(`Expected ObjC instance or null but received ${typeof arg}: ${arg}`);
-                }
-                ptr = obj.__ptr.ref();
-              }
-              inoutArgs.push({inOutRef: arg, ptr}); // arg = InOutRef, the value inside it will be updated after call
-              return ptr;
-            
-            case '^v': // `void*`; e.g. 2nd arg of NSAppleEventDescriptor.descriptorWithDescriptorType_bytes_length_(…)
-              return arg; // we assume arg is a Buffer containing a C pointer, although we do not (cannot) check this
-            
-            default:
-              throw new Error(`TO DO: InOutRef doesn't yet support inout args except 'id*' and 'void*': ${expectedArgumentType}`);
-            }
-          }
-        
-        default:
-          return arg; // leaving everything else for ForeignFunction's codecs to chew on
-        }
-      });
-      
-      //console.log(`${objcObject instanceof ObjCClass ? '+' : '-'}[${objcObject.name} ${methodDefinition.selector.name}] returning type '${methodDefinition.returnType}'`);
-
-      //console.log('pack args: '+methodName+': '+(Number(process.hrtime.bigint() - t)/1e6))
-      //t = process.hrtime.bigint()
-
-      // Doing the exception handling here is somewhat useless, since ffi-napi removed objc support
-      // (see https://github.com/node-ffi-napi/node-ffi-napi/issues/4 and https://github.com/node-ffi-napi/node-ffi-napi/commit/ee782d8510003fef67b181836bd089aae1e41f84)
-      // HAS: not going to worry about ObjC exceptions (they're supposed to kill the process, cos something Very Bad Has Already Happened, or else that method would've returned a recoverable NSError); in any case, ObjC is effective legacy so I doubt ffi project is concerned about chasing it, so removed the try-catch block (BTW, msgSend will also throw regular JS errors if any if its codecs throw)
-      let retval = methodDefinition.msgSend(objcObject.__ptr, methodDefinition.selector.__ptr, ...args);
-  
-      //console.log('call: '+methodName+': '+(Number(process.hrtime.bigint() - t)/1e6))
-      //t = process.hrtime.bigint()
-
-      inoutArgs.forEach(arg => {
-        if (arg.inOutRef instanceof InOutRef) { // it's an InOutRef box, so rewrap and rebox the instance ptr/null
-          let value = arg.ptr.deref();
-          let obj = (value === null || value.isNull()) ? null : wrapInstance(value); // TO DO: temporary this assumes the out value is ObjC instance ptr or nil; TO DO: support return-by-argument for non-`id` types; VTW, what's the right way to check if ptr.deref() has returned a NULL? do we need to check isNull, or does deref guarantee to convert NULL pointers to JS null?
-          arg.inOutRef.__object = obj; // replace the InOutRef's original boxed value with the new boxed value; the caller can then unbox the new value by calling InOutRef.deref()
-        } // else it's Buffer for `void*`, in which case leave it as is
-      });
-      
-      // check for `nil` result
-      if (retval instanceof Buffer && retval.isNull()) {
-        //console.log('returning nil')
-        return null;
-      
-      } else if (methodDefinition.returnType === '@') {
-        //console.log('returning ObjC instance...')
-        if (runtime.object_isClass(retval)) { // a Class is also an instance
-          let obj = getClassByPtr(retval);
-          if (!obj) { throw new Error(`Can't get ObjCClass for ${retval}`); } //
-        } else {
-          retval = wrapInstance(retval);
-        }
-        
-      } else if (methodDefinition.returnType === 'c') { // char OR bool; ObjC method signatures don't specify which
-        // TODO This means that we can't return chars, which is bad. Find a solution to support both!
-        //
-        // Q. does .bridgesupport provide any clarification on char vs BOOL? alternatively, we could check if the returned "NSNumber" is really a __NSCFBoolean instance, in which case maybe just convert that straight to true/false while we're at it (as there's only two possible values and I'd be surprised if Foundation didn't just allocate them permanently; no refcounting required)
-        retval = Boolean(retval);
-      }
-    
-      // for efficiency, returned NSString, NSArray, etc are not automatically converted back to JS values, as we have know way of knowing if caller will pass them to another ObjC method, or wants to use them in JS now (if caller specifically wants a JS value back, they need to wrap the method call in a js() function, and likewise apply js() to any out arguments)
-    
       //console.log('pack res: '+methodName+': '+(Number(process.hrtime.bigint() - t)/1e6))
       //console.log('...callObjCMethod returning: '+ isWrappedObjCInstance(retval));
-  
-      if (retval === undefined) { throw new Error('BUG callObjCMethod is returning undefined') }
-      // if (retval instanceof ObjCObject) { console.log('<'+retval[constants.__objcObject][Symbol.toStringTag]+'>') }
-      // else { console.log(`<${retval}>`) }
       return retval;
-    
-    
     } catch (e) {
+      
+      // TO DO: should this clear any __inptr, __outptr, __reftype values on Ref arguments?
+      
+      if (args.length != methodDefinition.argc - 2) { // TO DO: this doesn't support varargs
+        e = new Error(`Expected ${methodDefinition.argc - 2} arguments, got ${args.length}`);
+      }
       // TO DO: catch known errors and throw a new 'ObjCMethodError' error so the stack trace ends here (bugs should still throw stack all the way to source, so should modify existing Error.message and rethrow)
-      e.message = `${objcObject.name}.${methodDefinition.selector.tojs()}(...) ${e.message}`; // TO DO: this needs to check e is an Error before trying to mutate it
+      let msg = e.message; // kludge: massage 'bad argument' error message to make it easier to understand
+      if (e instanceof Error) { 
+        msg = msg.replace(/^error setting argument (\d+)/i, (m, n) => `argument ${n-2}`);
+      }
+      e.message = `${objcObject.name}.${methodDefinition.methodName} (${methodDefinition.encoding.replace(/[0-9]/g, '')}) ${msg}`;
+      //console.log(methodDefinition); // DEBUG
       throw e;
     }
   };
@@ -291,22 +142,21 @@ const wrapMethod = (objcObject, methodDefinition) => {
 // ObjC class and instance wrappers
 // these wrap ObjC class/instance objects and are, in turn, wrapped by Proxies that provide access to their ObjC methods
 
-// FWIW we could reduce this dual-wrapper `MethodProxy(ObjCObject(ptr))` to single `AllInOneProxy(ptr)`, where the state is in a simple object (keys+values only; no methods) and all behavior in the Proxy; the only slight downside being that we'll probably need 2 separate Proxy wrappers for ObjC classes vs instances, as opposed to single Proxy that covers both; that said, the cost of wrapping ptr in JS class instances over ADT is likely minimal and not a significant determinant of runtime performance (moving data between NS and JS representations is expensive, no doubt with lots of memcpys etc since JS seems to want C strings (char*) for interchange to be UTF8 whereas both JS and NS use UTF16 internally - being all-UTF16 could provide significant speedup)
 
-// TO DO: re. string representations, traditional Array and Date 'classes' represent themselves as "[Function: Array]" and "[Function: Date]" (since they're all just function until and unless blessed with `new` at a call site, at which point they return their stack frame encapsulated as an object), whereas ES6 'classes' represent as "[class Foo]" (really, they're all the same under the hood and inconsistencies in their naming schemes is historical)
+// TO DO: should ObjCInstance.tojs() include ptr's hex address, to distinguish one instance from another?
 
-// TO DO: ObjCInstance.tojs() should include ptr's hex address, to distinguish one instance from another
 
 // abstract base class; wraps a pointer to an ObjC class or instance
 
-class ObjCObject { // internal to objc, but can be accessed externally if required with standard caveat emptor
+class ObjCObject {
+  #__ptr;
 
   constructor(ptr) {
-    this.__ptr = ptr; // this should be treated as private to ObjCObject (i.e. don't go assigning to it)
+    this.#__ptr = ptr;
   }
   
   get ptr() { // read-only ptr property is nominally public (being used within objc, and needed when e.g. using NSObjects in CoreFoundation APIs via toll-free bridging)
-    return this.__ptr;
+    return this.#__ptr;
   }
   
 	get [Symbol.toStringTag]() {
@@ -329,20 +179,22 @@ class ObjCObject { // internal to objc, but can be accessed externally if requir
     // ...and then sometimes it doesn't, as `this` appears to change identity between the Proxy wrapper and the ObjCObject depending on who is calling this method from where (calling through the method wrapper, the Proxy becomes the proxied object's `this` [counterituitive, but probably a special Proxy behavior that's intended]; whereas displaying the returned object in the REPL, `this` is the ObjCObject itself [what would normally be expected]).
     //
     // note: since ObjC descriptions for NSArray, NSDescription, etc traditionally extend over multiple lines, this collapses all whitespace into single spaces to improve density and maintain consistency with JS's traditional bracket notation (toString still returns the original representation)
-    return `[objc: ${this.__callObjCMethod__('description').UTF8String().replace(/\s+/g, ' ')}]`;
+    return `[objc ${this.__callObjCMethod__('description').UTF8String().replace(/\s+/g, ' ')}]`;
   }
   
-  __callObjCMethod__(name, ...argv) {
+  __callObjCMethod__(name, ...args) {
     // an unwrapped ObjCObject can use this to call an ObjC method on itself (caution: external code should always use the method Proxy wrapper, not call __callObjCMethod__ directly)
     // name : string -- the method’s JS name, e.g. 'foo_bar_'
-    // argv : any -- any arguments to pass to the method
+    // args : any -- any arguments to pass to the method
     // Result: ObjCClass | ObjCInstance | null -- a method Proxy-wrapped ObjC object, or null (nil) (note: ObjC objects are not automatically converted back to JS types)
-    return (this.cachedMethods[name] || this.bindMethod(name))(...argv);
+    return (this.cachedMethods[name] || this.bindMethod(name))(...args);
   }
 }
 
 
 // concrete classes representing ObjC objects of types `Class` and `id`
+
+let __introspectMethod = null;
 
 
 class ObjCClass extends ObjCObject {
@@ -360,24 +212,12 @@ class ObjCClass extends ObjCObject {
     this.__name = runtime.class_getName(ptr);
   }
   
-  _introspectMethod(object, methodName) {
+  introspectMethod(object, methodName) {
     // object : ObjCClass | ObjCInstance
     // methodName : string -- JS-style method name, e.g. "foo_bar_"
-  //  console.log('introspect "'+methodName+'"')
-    try {
-      // sanity checks; TO DO: get rid of these once satisfied callers always pass correct argument types
-      if (!object instanceof ObjCObject || object[constants.__objcObject]) {
-        throw new TypeError(`ObjCClass._introspectMethod expected unwrapped ObjCObject but received ${typeof object}`);
-      }
-      if (!constants.isString(methodName)) {
-        throw new TypeError(`ObjCClass._introspectMethod expected string name but received ${typeof methodName}`);
-      }
-      let signature = encodings.introspectMethod(object, Selector.fromjs(methodName));
-      return signature;
-    } catch (e) {
-      e.message = `Cannot introspect ${String(object)} '${String(methodName)}' ${e}`;
-      throw e;
-    }
+    // Result: object -- see objctypes.introspectMethod for details
+    if (!__introspectMethod) { __introspectMethod = require('./objctypes').introspectMethod; }
+    return __introspectMethod(object, methodName);
   }
   
   get name() {
@@ -396,22 +236,24 @@ class ObjCClass extends ObjCObject {
     return hint === 'number' ? Number.NaN : `[ObjCClass: ${this.name}]`; // TO DO: how to represent a class? a parenthesized literal expression might be best, e.g. `(objc.NSString)`, as it is both self-descriptive and can-be copy+pasted+evaluated to recreate it; however, that doesn't work so well with instances, where we'd need to replicate the constructor and arguments as literals as well (we might eventually do that for the bridged Foundation types, but anything else is probably best using the ObjC description string)
   }
   
-  objcMethodPtr(selector) { // looks up and returns the C pointer to the specified class method; used by introspectMethod
-    return runtime.class_getClassMethod(this.__ptr, selector.__ptr);
+  objcMethodPtr(sel) { // looks up and returns the C pointer to the specified class method; used by introspectMethod
+    return runtime.class_getClassMethod(this.ptr, sel);
   }
   
   bindMethod(methodName) { // create a wrapper for the named ObjC class method and bind it to this ObjClass
     // note: this is  called by method Proxy wrapper, once for each class method used
-    let methodDefinition = this._introspectMethod(this, methodName);
+    let methodDefinition = this.introspectMethod(this, methodName);
     let method = wrapMethod(this, methodDefinition);
     this.cachedMethods[methodName] = method;
     return method;
   }
   
   bindInstanceMethod(instanceObject, methodName) { // this is called once for each instance method
+    // instanceObject : ObjCObject -- unwrapped
+    // methodName : string
     let methodDefinition = this.instanceMethodDefinitions[methodName];
     if (!methodDefinition) {
-      methodDefinition = this._introspectMethod(instanceObject, methodName);
+      methodDefinition = this.introspectMethod(instanceObject, methodName);
       this.instanceMethodDefinitions[methodName] = methodDefinition;
     }
     return wrapMethod(instanceObject, methodDefinition);
@@ -435,7 +277,7 @@ class ObjCInstance extends ObjCObject {
   }
   
   get name() {
-    return runtime.object_getClassName(this.__ptr);
+    return runtime.object_getClassName(this.ptr);
   }
   
   tojs(hint = 'default') { // we won't define [toPrimitive] on ObjCObjects as it all gets very confusing and unhelpful, but the method Proxy's [toPrimitive](hint) calls ObjCObject.tojs(hint)
@@ -451,11 +293,15 @@ class ObjCInstance extends ObjCObject {
     }
   }
   
-  objcMethodPtr(selector) { // looks up and returns the C pointer to the specified instance method; used by bindMethod()
-    return runtime.class_getInstanceMethod(runtime.object_getClass(this.__ptr), selector.__ptr); 
+  objcMethodPtr(sel) { // looks up and returns the C pointer to the specified instance method; used by bindMethod()
+    // sel : Buffer -- pointer to ObjC selector
+    // Result : Buffer -- pointer to ObjC method; may be NULL
+    return runtime.class_getInstanceMethod(runtime.object_getClass(this.ptr), sel); // TO DO: or constructor could get Class ptr: `this.classPtr = classObject[constants.__objcClassPtr]`? (TBH, I doubt it makes any difference to performance either way)
   }
   
   bindMethod(methodName) {
+    // methodName : string
+    // Result: function
     // get the method wrapper and bind it to this ObjCInstance
     let method = this.classObject[constants.__objcObject].bindInstanceMethod(this, methodName);
     this.cachedMethods[methodName] = method;
@@ -533,12 +379,8 @@ const createMethodProxy = obj => {
           return objcObject;
         
         case '__callObjCMethod__': // TO DO: make this a Symbol? or can we live with one "magic method" exposed as string? (fairly sure ObjC doesn't use double underscores in any method names; and if there was an ObjC method named `_call_` then it’d have zero extra arguments whereas this has at least one, so any collision will soon be resolved by something barfing an error)
-          return (name, ...argv) => objcObject.__callObjCMethod__(name, ...argv);
+          return (name, ...args) => objcObject.__callObjCMethod__(name, ...args);
           
-        // deprecated
-        case '__ptr': // TO DO: remove
-          console.log(`Warning: getting deprecated ${methodName} property on method Proxy`);
-          return objcObject.ptr;
         // TO DO: should be able to delete the next 2 cases now, as cachedMethods lookup will always return these
         case constants.__objcClassPtr:
         case constants.__objcInstancePtr:
@@ -552,7 +394,7 @@ const createMethodProxy = obj => {
         // inspection/coercion
         
         case util.inspect.custom:
-          console.log(`returning function for method Proxy's util.inspect.custom`)
+          //console.log(`returning function for method Proxy's util.inspect.custom`)
           return (depth, options) => {
             //console.log(`calling method Proxy's returned util.inspect.custom function`)
             /*
@@ -593,7 +435,7 @@ const createMethodProxy = obj => {
             if (objcObject instanceof ObjCClass) {
               return objcObject.tojs(hint);
             }
-            let obj = converters.js(proxyObject, true); // quick-n-dirty (it is simpler to convert the ObjCInstance to JS value and have JS convert that, rather than go straight from ObjCInstance to JS retval - which would require replicating JS's own convoluted rules here); note: this should be non-strict, as unconvertible values will be turned below; that said, js() will be more efficient once it maps the ObjC ptr for NSString, NSNumber, etc directly to their corresponding JS types, as JS will already be quite efficient at getting those JS objects' string/number representation (although I wonder why it only does those and not 'boolean' too; but…JS)
+            let obj = js(proxyObject, true); // quick-n-dirty (it is simpler to convert the ObjCInstance to JS value and have JS convert that, rather than go straight from ObjCInstance to JS retval - which would require replicating JS's own convoluted rules here); note: this should be non-strict, as unconvertible values will be turned below; that said, js() will be more efficient once it maps the ObjC ptr for NSString, NSNumber, etc directly to their corresponding JS types, as JS will already be quite efficient at getting those JS objects' string/number representation (although I wonder why it only does those and not 'boolean' too; but…JS)
             //console.log('tried converting to js => '+typeof obj)
             // first, deal with any types that must/can be reduced to numbers...
             if (hint === 'number' || (hint === 'default' && (constants.isBoolean(obj) || constants.isNumber(obj)))) {
@@ -694,7 +536,6 @@ module.exports = {
   
   // objc exports instance module as objc.__internal__, so export low-level runtime and types modules on that
   runtime,
-  types,
   
   [util.inspect.custom]: (depth, inspectOptions, inspect) => '[object objc.__internal__]',
 };

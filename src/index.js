@@ -7,16 +7,18 @@
 const util = require('util');
 
 const constants = require('./constants');
-const types = require('./types');
 const runtime = require('./runtime');
 const instance = require('./instance');
-const {js, ns} = require('./type-converters');
-const InOutRef = require('./inout.js');
+const {js, ns} = require('./codecs');
+const ObjCRef = require('./objcref');
+const objctypes = require('./objctypes');
+
 const Block = require('./block');
 const Selector = require('./selector');
 const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
 const {defineStruct} = require('./structs');
 
+instance.types = objctypes;
 
 
 const importFramework = name => {
@@ -54,23 +56,22 @@ module.exports = new Proxy({
   // creating ObjC-specific types
   // note: use objc.__internal__.types to access napi-ref-compatible type objects currently used by Block, Selector, etc (moving it there reduces top-level noise in objc namespace, and it is lower-level technical stuff for use in ffi-napi); TO DO: if/when .bridgesupport is implemented, users should almost never need to define Struct types, or C function or Block argument/result types manually (hence `objc.__internal__.types`, not `objc.types`, in anticipation of this); FWIW, once ObjC type encoding parser can read full signatures, we should probably just use that for user-defined Structs, Blocks, NSObject subclasses too: the overhead of parsing those strings into ref-napi types will be minimal and ObjC type strings are probably easier to write than ref-napi code
   Block,
-  InOutRef,
+  Ref: ObjCRef,
   Selector,
   
   
   NSRange: defineStruct('_NSRange', { // TO DO: check this (Q. why is struct name prefixed?)
-    location: types.NSUInteger,
-    length: types.NSUInteger,
-    
+    location: objctypes.NSUInteger,
+    length: objctypes.NSUInteger,
+  }), 
+  
   [util.inspect.custom]: (depth, inspectOptions, inspect) => { // not called by console.log(objc)
     console.log('inspecting objc delegate object') 
     return '[object objc]';
   },
     
-  }), 
   
-  
-  defineStruct, // TO DO: how/where should type constructors be presented? e.g. createClass, defineStruct, and Block will all need objc.types; also, their names and instantiation processes are all inconsistent
+  defineStruct, // TO DO: how/where should type constructors be presented? e.g. createClass, defineStruct, and Block will all need objctypes; also, their names and instantiation processes are all inconsistent
   
   createClass, // TBD
   

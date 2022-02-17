@@ -16,24 +16,24 @@ const runtime = require('./runtime');
 
 
 class Selector {
+  #__ptr;
 
   constructor(input) { // create a Selector from string (e.g. 'foo:bar:') or existing SEL ptr
     // caution: this (public) constructor does not type check to ensure the given value is a string/SEL
     if (constants.isString(input)) {
-      this.__ptr = runtime.sel_getUid(input);
+      this.#__ptr = runtime.sel_getUid(input);
     } else {
-      this.__ptr = input;
+      this.#__ptr = input;
     }
   }
   
-  static fromjs(methodName) { // create a Selector from JS-style name, e.g. "foo_bar_"
-    let objcName = methodName.replace(/__?/g, s => s.length === 1 ? ':' : '_'); // TO DO: see TODO above re. resolving remaining ambiguity
-    return new Selector(objcName);
+  
+  static selectorNameFromJS(name) {
+    return name.replace(/__?/g, s => s.length === 1 ? ':' : '_'); // TO DO: see TODO above re. resolving remaining ambiguity
   }
   
-  tojs() { // TO DO: see above TODO re. ambiguity
-    // Result: string -- the method's JS (underscore-delimited) name
-    return this.name.replace(/[:_]/g, s => { // TO DO: see TODO above re. resolving remaining ambiguity
+  static selectorNameToJS(name) {
+    return name.replace(/[:_]/g, s => { // TO DO: see TODO above re. resolving remaining ambiguity
       switch (s) {
       case ':':
         return '_';
@@ -42,13 +42,23 @@ class Selector {
       }
     });
   }
+  
+  
+  static fromjs(selectorName) { // create a Selector from JS-style name, e.g. "foo_bar_"
+    return new Selector(Selector.selectorNameFromJS(selectorName));
+  }
+  
+  tojs() { // TO DO: see above TODO re. ambiguity
+    // Result: string -- the method's JS (underscore-delimited) name
+    return Selector.selectorNameToJS(this.name);
+  }
 
   get name() { 
     // Result: string -- the method's ObjC (colon-delimited) name
-    return runtime.sel_getName(this.__ptr);
+    return runtime.sel_getName(this.#__ptr);
   }
   
-  get ptr() { return this.__ptr; } // this is consistent with ObjCObject's API; internally objc can continue to access __ptr (as JS can't make that private in any case), but if client code needs to pass a raw SEL to e.g. ObjC's C-based runtime APIs it will need this raw pointer
+  get ptr() { return this.#__ptr; }
   
   get [String.toStringTag]() { `Selector=${this.name}` }
 }

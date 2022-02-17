@@ -75,6 +75,8 @@ The framework for that class must be imported first or an `Error` will be thrown
 
 ### Calling methods
 
+_TO DO: struct, array, union, bitwise types_
+
 When calling Objective-C methods:
 
 - replace any underscores in the selector with double underscores, e.g. `"foo_barBaz"` becomes `"foo__barBaz"`
@@ -105,16 +107,16 @@ pasteboard.declareTypes_owner_([NSPasteboardTypeString], null);
 pasteboard.setString_forType_("44 > 45", NSPasteboardTypeString);
 ```
 
-### Inout parameters
+### Inout arguments
 
-If a method expects an inout parameter (like `NSError**`), use an `objc.InOutRef` instance:
+If a method expects an `inout` or `out` argument (e.g. `NSError**`), use an `objc.Ref` instance:
 
 ```js
-const {NSAppleScript, InOutRef} = objc;
+const {NSAppleScript, Ref} = objc;
 
 const script = NSAppleScript.alloc().initWithSource_('foobar');
 
-const error = new InOutRef();
+const error = new Ref();
 script.executeAndReturnError_(error); // `executeAndReturnError:` takes a `NSDictionary**`
 
 console.log(error.deref()); // `error` is now a `NSDictionary*`
@@ -131,19 +133,19 @@ Output:
 }]
 ```
 
-The `InOutRef` constructor optionally takes an "in" value as argument. This can be an objc object, JS value, or null (the default). On return, call its `deref` method to obtain the out value.
-
-Caution: `InOutRef` currently supports objc class and instance methods only. For Blocks/Structs, use the [`ref-napi`](https://github.com/TooTallNate/ref) module.
+The `Ref` constructor optionally takes an "in" value as argument. This can be an objc object, JS value, or null (the default). On return, call its `deref` method to obtain the out value.
 
 
 ### Blocks
+
+_TO DO: finalize and test_
 
 You can create a block with the `objc.Block` helper class:
 
 ```js
 const block = new objc.Block(() => {
   console.log('In the block!');
-}, 'v', []);
+}, 'v');
 ```
 
 When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters. (For now, use ref-napi types.)

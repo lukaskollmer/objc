@@ -17,16 +17,16 @@ console.log("did compile="+scpt.isCompiled())
 console.log("source code="+objc.js(scpt.source()))
 
 
-// TO DO: InOutRef currently doesn't work with either nil or @
-// msgSend error: TypeError: error setting argument 3 - writePointer: Buffer instance expected as third argument
 
-let error = null //objc.NSString.stringWithString_('')
+//let error = null //objc.NSString.stringWithString_('')
 
-let errorRef = new objc.InOutRef(error)
+let errorRef = new objc.Ref()
 
 let res = scpt.compileAndReturnError_(errorRef)
 
-error = errorRef.deref()
+console.log('RES =', res)
+
+error = errorRef.value
 
 console.log("error="+typeof error + '  ' + error instanceof objc.__internal__.ObjCObject)
 if (error) { error = error.description().UTF8String() }
@@ -35,4 +35,5 @@ console.log("compileAndReturnError: success=" + res + '  err=' + error)
 //console.log('J: <'+v.description().UTF8String()+'>')
 
 console.log('test class: '+objc.NSString)
+
 

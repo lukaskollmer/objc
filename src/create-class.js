@@ -30,7 +30,7 @@ const addMethods = (dest, methods) => {
     const [returnType, argumentTypes] = encoding;
     const block = new Block(methods[name], returnType, argumentTypes, false);
     
-    const imp = block.getFunctionPointer();
+    const imp = block.ptr;
     _retainGlobal(imp); // may not need this depending on how we capture the methods
     
     runtime.class_addMethod(dest, selector, imp, [].concat.apply([], encoding).join(''));

@@ -2,6 +2,10 @@ const test = require('ava');
 const objc = require('./src/index');
 const util = require('util');
 
+
+// TO DO: these tests need updated/rewritten for new APIs
+
+
 const NULL_DESC = '[objc.Instance (null)]';
 
 // TODO
