@@ -91,7 +91,7 @@ const objc_instance_t = {
     } else {
       ptr = ns(value, (value) => {
         throw new TypeError(`Expected an ObjC instance or null but received ${typeof value}: ${util.inspect(value)}`);
-      }, false);
+      }, true);
     }
     ref.writePointer(buffer, 0, ptr);
   },

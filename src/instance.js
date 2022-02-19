@@ -130,11 +130,12 @@ const wrapMethod = (objcObject, methodDefinition) => {
         e = new Error(`Expected ${methodDefinition.argc - 2} arguments, got ${args.length}`);
       }
       // TO DO: catch known errors and throw a new 'ObjCMethodError' error so the stack trace ends here (bugs should still throw stack all the way to source, so should modify existing Error.message and rethrow)
-      let msg = e.message; // kludge: massage 'bad argument' error message to make it easier to understand
-      if (e instanceof Error) { 
-        msg = msg.replace(/^error setting argument (\d+)/i, (m, n) => `argument ${n-2}`);
-      }
-      e.message = `${objcObject.name}.${methodDefinition.methodName} (${methodDefinition.encoding.replace(/[0-9]/g, '')}) ${msg}`;
+      if (!(e instanceof Error)) { e = new Error(String(e)); }
+      // kludge: massage 'bad argument' error message to make it easier to understand
+      let msg = e.message.replace(/^error setting argument (\d+)/i, (m, n) => `argument ${n-2}`); // adjust arg no.
+      const argTypes = args.map((o) => `[${typeof o === 'object' ? o.constructor.name : typeof o}]`).join(', ');
+      const enc = methodDefinition.encoding.replace(/[0-9]/g, '');
+      e.message = `${objcObject.name}.${methodDefinition.methodName} expected '${enc}', got (${argTypes}): ${msg}}`;
       //console.log(methodDefinition); // DEBUG
       throw e;
     }
