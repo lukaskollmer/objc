@@ -2,7 +2,9 @@
 
 const objc = require('objc')
 
-let v = objc.NSString.stringWithString_('')
+let v 
+
+v = objc.NSString.stringWithString_('')
 v.description()
 
 let v2 = v
@@ -12,7 +14,7 @@ console.log()
 // objc.NSAppleScriptErrorAppName
 
 
-let i, n = 1000 // currently does 1K repeat calls in ~0.15sec, which is slow but usable; however, there is still significant overhead when converting argument and return values, operations which themselves involve calling multiple ObjC methods - currently each of those method invocations also goes through the full objc bridge, but since there's only a handful of standard JS types to bridge we could bypass the wrappers and use raw pointers to their corresponding ObjC classes, instances, and methods directly in ffi)
+let i, n = 10//00 // currently does 1K repeat calls in ~0.15sec, which is slow but usable; however, there is still significant overhead when converting argument and return values, operations which themselves involve calling multiple ObjC methods - currently each of those method invocations also goes through the full objc bridge, but since there's only a handful of standard JS types to bridge we could bypass the wrappers and use raw pointers to their corresponding ObjC classes, instances, and methods directly in ffi)
 
 let b = true
 

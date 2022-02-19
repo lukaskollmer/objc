@@ -358,7 +358,7 @@ class ObjCTypeEncodingParser {
         throw new Error("TO DO: return bitfield type");
         break;
       default:
-        const token = token === undefined ? 'end of encoding' : `'${token}'`;
+        const token = token === undefined ? 'end of string' : `'${token}'`;
         throw new Error(`Bad type encoding: unexpected ${token} in '${this.encoding}'`);
       }
     }
@@ -369,16 +369,27 @@ class ObjCTypeEncodingParser {
   
   //
 
-  parse(encoding, isMethod = true) {
+  parse(encoding) {
+    // parse a single type encoding, e.g. "o^@"
     // encoding : string -- ObjC type encoding
+    // Result: object -- ref-napi compatible type definition
     this.encoding = encoding;
     this.cursor = 0;
-    this.isArgument = !isMethod; // when parsing method signature, first type is return type
-    const types = [];
-    while (this.currentToken) {
-      types.push(this.parseType());
-    }
+    let type = this.parseType();
     if (this.cursor !== this.encoding.length) { throw new Error(`Bad type encoding '${encoding}'`); }
+    return type;
+  }
+
+  parseTypes(encoding) {
+    // parse one or more encoding, e.g. "o^@"
+    // encoding : string -- ObjC type encoding
+    // Result: [object] -- one or more ref-napi compatible type definitions
+    this.encoding = encoding;
+    this.cursor = 0;
+    const types = [];
+    do {
+      types.push(this.parseType());
+    } while (this.currentToken);
     return types;
   }
 }
@@ -390,7 +401,7 @@ const typeParser = new ObjCTypeEncodingParser();
 /******************************************************************************/
 
 
-const coerceObjCType = (encoding) => typeParser.parse(encoding);
+const coerceObjCType = (encoding) => typeParser.parseTypes(encoding);
 
 
 const introspectMethod = (object, methodName) => {
@@ -431,7 +442,7 @@ const introspectMethod = (object, methodName) => {
     throw new TypeError(`No method named objc.${object.name}.${methodName}${msg}`);
   }
   const encoding = runtime.method_getTypeEncoding(method);
-  const argTypes = typeParser.parse(encoding); // [result, target, selector,...arguments]
+  const argTypes = typeParser.parseTypes(encoding); // [result, target, selector,...arguments]
   const returnType = argTypes.shift();
   // TO DO: stripped down encoders for first 2 arguments, and always pass ptrs for those to msgSend
   argTypes[0] = pointerType;

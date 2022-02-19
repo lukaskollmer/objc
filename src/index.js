@@ -9,7 +9,7 @@ const util = require('util');
 const constants = require('./constants');
 const runtime = require('./runtime');
 const instance = require('./instance');
-const {js, ns} = require('./codecs');
+const {ns, js} = require('./codecs').initialize(); // codecs cannot be initialized until './instance' has been fully imported // TO DO: can/should instance.js make this call after its module.exports is defined?
 const ObjCRef = require('./objcref');
 const objctypes = require('./objctypes');
 
@@ -17,6 +17,8 @@ const Block = require('./block');
 const Selector = require('./selector');
 const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
 const {defineStruct} = require('./structs');
+
+instance.swizzle = require('./swizzle');
 
 instance.types = objctypes;
 
@@ -65,9 +67,8 @@ module.exports = new Proxy({
     length: objctypes.NSUInteger,
   }), 
   
-  [util.inspect.custom]: (depth, inspectOptions, inspect) => { // not called by console.log(objc)
-    console.log('inspecting objc delegate object') 
-    return '[object objc]';
+  [util.inspect.custom]: (depth, inspectOptions, inspect) => { // called by console.log(objc)
+    return '[object objc]'; // TO DO: opaque/shallow/deep inspection options (bear in mind that inspecting the `objc` object will only show hardcoded members, and maybe already-imported objects if we make it smart enough to list those too)
   },
     
   
@@ -87,37 +88,21 @@ module.exports = new Proxy({
     if (Object.prototype.hasOwnProperty.call(builtins, key)) { // TO DO: curious why? there shouldn't be anything on builtins object's prototype chain, or is this to guard against any JS runtime shenannigans, injecting crud where it shouldn't be (i.e. into Object itself)?
       return builtins[key];
     } else if (constants.isString(key)) {
-    
-  
+      
       retval = instance.getClassByName(key);
     
-      if (retval === undefined) {
-      // Not a class, see if we can find a constant with that name
+      if (retval === undefined) { // not a class, so see if we can find a constant with that name
+        // note: this only works for [e.g.] NSString constants; primitive constants are typically defined in header, not object file, so aren't runtime-accessible (at least, not without bridgesupport XML), e.g.:
+        //
+        //  console.log(objc.NSAppleScriptErrorAppName) // this works
+        //  console.log(objc.NSUTF8StringEncoding) // this doesn't
+        //
         const ptr = runtime.getSymbolAsId(key);
-        if (ptr !== null) {
-      
-        // TO DO: why is NSString constant found but NSUInteger constant not? (I’m assuming that string constants, being objects, have to be exported by the object file; whereas numeric C constants are normally defined in .h only so their names don't appear in symbol table); this doesn't preclude the possibility of non-NSString constants appearing in symbol table (e.g. CString, NSNumber), so automatically assuming that a constant is an NSString, or even an ObjC object, would be unwise; for now though, we'll assume it's some sort of NSObject, and if user tries to import any other symbol (e.g. C function) we can't really prevent that (and it will most likely crash); the eventual solution is to use bridgesupport or maybe PyObjC’s header parser to generate tables of all non-ObjC symbols (parsing headers would also allow exact argument types for all methods to be determined—in theory introspection could provide '@<classname>', but in practice is normally just '@', and chances are those parsed tables could be used to construct method wrappers more quickly than introspection does, so pregenerated glues could use those and leave introspection as fallback when a glue isn't available) (of note: importing PyObjC glue modules, e.g. `import Foundation`, is surprisingly laggy (1–2 sec); wonder if that's because it generates a full set of class and method wrappers at import time, rather than generating them individually as and when needed?)
-        
-          //console.log(objc.NSAppleScriptErrorAppName)
-          //console.log(objc.NSUTF8StringEncoding)
-
-          //console.log(objc.runtime.getSymbol('NSAppleScriptErrorAppName'))
-          //console.log(objc.runtime.getSymbol('NSUTF8StringEncoding'))
-
-      
-          //console.log(`creating symbol: ${runtime.object_getClassName(ptr)}`);
-        
-          retval = instance.wrapInstance(ptr);
-          builtins[key] = retval;
-        
-          // originally: retval = (new InstanceProxy(new Instance(ptr))).UTF8String(); // TO DO: why call UTF8String() to convert back to JS string? the only reason to get these keys is to use them in ObjC APIs, so converting to JS strings is creating extra work; the main gotcha is when using NSStrings as JS object keys, but that can be addressed by having toString()/toPrimitive() return -UTF8String instead of -description when the ObjC object isKindOfClass:NSString (note that -[NSString description] already does this, returning NSString's actual value instead of descriptive representation as is case for e.g. -[NSArray description] and others, so all we're doing is avoiding the "[ObjCInstance CLASS DESCRIPTION]" JS-style description string that will be generated for most NS classes) // for now, let's leave the value as an ObjC instance
-    
-        } else {
-          // TO DO: should this return undefined (the standard JS behavior) or throw (more foolproof)?
-          // return undefined; 
-          throw new Error(`Unable to find 'objc.${key}'`);
-    
+        if (ptr === null) {
+          throw new Error(`Not found: 'objc.${key}'`); // TO DO: should this return undefined (the standard JS behavior)? throwing a descriptive error is more foolproof; see also 'unknown method' errors on class and instance objects
         }
+        retval = instance.wrapInstance(ptr);
+        builtins[key] = retval;
       }
     } else {
       switch (key) {
@@ -126,12 +111,8 @@ module.exports = new Proxy({
           return hint === 'number' ? Number.NaN : '[object objc]';
         }
         break;
-      case util.inspect.custom: // also not called by console.log(objc)
-        console.log('objc-get-ing inspect function')
-        retval = () => '[object objc]'; // `{${Array(builtins)}}`;
-        break;
       default:
-        throw new Error(`Unable to find 'objc[${key}]'`);
+        throw new Error(`Not found: 'objc[${String(key)}]'`);
       }
     }
     
@@ -140,11 +121,7 @@ module.exports = new Proxy({
   },
   
   set: (_, key, value) => {
-    throw new Error(`Cannot set 'objc.${key}'`);
+    throw new Error(`Can't set 'objc.${key}'`); // TO SO: as above, this is more robust than JS's default behavior
   },
-  
-  [util.inspect.custom]() { // and not called by console.log(objc) either
-    console.log('objc inspect proxy handler');
-    return '[object objc]';
-  }
+
 });

@@ -10,6 +10,9 @@
 
 // TO DO: there is circular reference between instance and objctypes (instance currently imports objctypes.introspectMethod on first use)
 
+// TO DO: wrap NSArray (and NSDictionary?) instances in custom Proxy objects that implement standard JS Array/Object APIs in addition to ObjC instance methods; this would allow a degree of polymorphism, reducing need to explicitly unpack (with added caveat that proxies around mutable NS objects probably can't cache unpacked items as the NS object's contents may change at any time)
+
+
 const util = require('util');
 
 const ffi = require('ffi-napi');
@@ -87,6 +90,7 @@ const wrapInstance = ptr => {
   // Result: Proxy(ObjCInstance)
   return createMethodProxy(new ObjCInstance(getClassByPtr(runtime.object_getClass(ptr)), ptr));
 }
+
 
 const wrapMethod = (objcObject, methodDefinition) => {
   // create a method wrapper bound to a ObjCClass/ObjCInstance
@@ -520,6 +524,8 @@ module.exports = {
   wrap: ptr => (runtime.object_isClass(ptr) ? getClassByPtr(ptr) : wrapInstance(ptr)),
   wrapClass: getClassByPtr,
   wrapInstance,
+  
+  createMethodProxy, // used by ./codecs
   
   // these internal classes are exported here for [largely internal] type-checking; external code should not instantiate them directly
   ObjCObject,
