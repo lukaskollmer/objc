@@ -509,9 +509,17 @@ const createMethodProxy = obj => {
 
 const isWrappedObjCObject = object => object && object[constants.__objcObject] !== undefined;
 
-const isWrappedObjCClass = object => object && object[constants.__objcClassPtr] !== null;
+const isWrappedObjCClass = object => {
+  if (!object) { return false; }
+  let ptr = object[constants.__objcClassPtr];
+  return ptr !== undefined && ptr !== null;
+}
 
-const isWrappedObjCInstance = object => object && object[constants.__objcInstancePtr] !== null;
+const isWrappedObjCInstance = object => {
+  if (!object) { return false; }
+  let ptr = object[constants.__objcInstancePtr];
+  return ptr !== undefined && ptr !== null;
+}
 
 
 /******************************************************************************/
