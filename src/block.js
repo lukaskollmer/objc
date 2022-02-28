@@ -2,10 +2,10 @@
 
 // wraps a JS function as an ObjC block so it can be called from ObjC // TO DO: there is some overlap between this and create-class.js, so perhaps opportunities to consolidate?
 
-// TO DO: what about ObjC properties/methods that return an ObjC block? (the block will appear as a pointer of type `@?`, but won't be mappable to BlockType, which is JS->NS only; for now, the objc_block_t)
+// TO DO: what about ObjC properties/methods that return an ObjC block? (the block will appear as a pointer of type `@?`, but won't be mappable to ObjCBlockType, which is JS->NS only; for now, the objc_block_t)
 
 
-// TO DO: should BlockType, StructType appear behind `objc.types.Proxy(...)`, allowing them to be looked up by name once defined via `defineBlock(encoding, [name])`/`defineStruct(encoding, [name])`
+// TO DO: should ObjCBlockType, StructType appear behind `objc.types.Proxy(...)`, allowing them to be looked up by name once defined via `defineBlock(encoding, [name])`/`defineStruct(encoding, [name])`
 
 /*
 
@@ -26,9 +26,9 @@
 
 const ffi = require('ffi-napi');
 const ref = require('ref-napi');
+const StructType = require('ref-struct-di')(ref);
 
 const constants = require('./constants');
-const structs = require('./structs');
 const runtime = require('./runtime');
 
 const pointerType = ref.refType(ref.types.void);
@@ -42,7 +42,7 @@ const _NSConcreteGlobalBlock = runtime.getSymbol('_NSConcreteGlobalBlock');
 
 // an ObjC block
 
-const block_t = structs.defineStruct(null, {
+const block_t = StructType({ // note: StructType does not use `new`
   isa:        pointerType,
   flags:      ref.types.int32,
   reserved:   ref.types.int32,
@@ -50,14 +50,16 @@ const block_t = structs.defineStruct(null, {
   descriptor: pointerType
 });
 
-const descriptor = structs.defineStruct(null, {
+const descriptor_t = StructType({
   reserved:   ref.types.ulonglong,
   block_size: ref.types.ulonglong
-}).new(0, block_t.size);
+});
+
+const descriptor = new descriptor_t(0, block_t.size);
 
 
 
-class BlockType { // caution: as with ObjCClass, users should not instantiate BlockType directly
+class ObjCBlockType { // caution: as with ObjCClass, users should not instantiate ObjCBlockType directly
   
   constructor(encoding) {
     // encoding : string -- ObjC encoding string
@@ -75,7 +77,7 @@ class BlockType { // caution: as with ObjCClass, users should not instantiate Bl
   }
   
   get(buffer, offset, type) {
-    throw new Error('TO DO: BlockType.get');
+    throw new Error('TO DO: ObjCBlockType.get');
     // TO DO: is this correct? no
     //const ptr = buffer.readPointer();
     //return ptr.isNull() ? null : new Block(this, ffi.ForeignFunction(ptr, this.returnType, this.argumentTypes));
@@ -105,13 +107,13 @@ class BlockType { // caution: as with ObjCClass, users should not instantiate Bl
 const _blockTypes = {}; // cache
 
 
-const getBlockType = (encoding) => { // similar to getClassByName, this looks up BlockType by encoding string, creating and caching a new BlockType object if it doesn't already exist
+const getBlockType = (encoding) => { // similar to getClassByName, this looks up ObjCBlockType by encoding string, creating and caching a new ObjCBlockType object if it doesn't already exist
   if (!constants.isString(encoding)) {
     throw new Error(`getBlockType expected an encoding string, got ${typeof encoding}: ${encoding}`);
   }
   let type = _blockTypes[encoding];
   if (!type) {
-    type = new BlockType(encoding);
+    type = new ObjCBlockType(encoding);
     _blockTypes[encoding] = type;
   }
   return type;
@@ -130,7 +132,7 @@ class Block {
     if (typeof fn !== 'function') { 
       throw new TypeError(`objc.Block expected a function, got ${typeof fn}: ${fn}`); 
     }
-    type = type instanceof BlockType ? type : getBlockType(type);
+    type = type instanceof ObjCBlockType ? type : getBlockType(type);
     // use function.length to determine number of named parameters to fn; if this is 1 less than no of arguments in encoding, don't pass the block as first argument to callback (be aware that fn.length doesn't count named parameters that have a default value, nor ...rest; however, that'd only be an issue if user was recycling an existing function written for non-ObjC related code; in general, functions passed here will be written specifically for use in blocks)
     let skipBlockArgument;
     if (fn.length === type.argumentTypes.length) {
@@ -151,7 +153,7 @@ class Block {
     this.#fn = fn;
     this.#type = type;
     this.#callback = callback;
-    this.#ptr = block_t.new(structs.CompoundInit, {
+    this.#ptr = new block_t({ // TO DO: no idea if this is correct
         isa:        _NSConcreteGlobalBlock,
         flags:      1 << 29,
         reserved:   0,
@@ -168,7 +170,7 @@ class Block {
 }
 
 module.exports = {
-  BlockType, // for typechecking only
+  getBlockType, // returns a ObjCBlockType for given encoding; e.g. getBlockType(enc).newBlock(fn) -> Block
+  ObjCBlockType, // for typechecking only
   Block, // for typechecking only
-  getBlockType, // returns a BlockType for given encoding; e.g. getBlockType(enc).newBlock(fn) -> Block
 };

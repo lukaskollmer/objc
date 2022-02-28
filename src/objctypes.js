@@ -16,7 +16,7 @@
 //  NSRectPointer '{CGRect="origin"{CGPoint}"size"{CGSize}}'
 //
 
-// TO DO: ref-array-napi, ref-struct-di, ref-union-napi
+// TO DO: ref-array-napi, ref-union-napi
 
 // TO DO: ref-bitfield doesn't seem to have napi version
 
@@ -30,20 +30,23 @@ const Block = require('./block');
 const instance = require('./instance');
 const runtime = require('./runtime');
 const Selector = require('./selector');
-const structs = require('./structs');
 const ObjCRef = require('./objcref');
 const {ns} = require('./codecs');
+
+let objcstruct = null; // lazily loaded by parser due to circular reference between objctypes and objcstruct
 
 const pointerType = ref.refType(ref.types.void);
 
 
 /******************************************************************************/
 // ref-napi compatible type definitions for wrapping and unwrapping ObjC objects
-
+//
+// Important: `Class` and `id` types are themselves *always* pointers to an ObjC structure, e.g. `NSString*` is a sub-type of `id`. There is no way to allocate an ObjC class instance directly on the stack, as can be done with C++. Therefore a `ref.refType(TYPE)` call should only be applied when creating a pointer to that pointer, e.g. `NSError**`, and even then it is normally more convenient (and robust) to use objc's `Ref` instead.
+//
 //
 // note: when TYPE.indirection===1, ffi.ForeignFunction calls TYPE.set/get() to convert the given data to/from C (this is counterintuitive, but ffi treats 0 as an error along with other falsy values)
 //
-// these atomic types ignore any `offset` argument as it should always be 0 anyway
+// TO DO: these (atomic) types ignore any `offset` argument as it should always be 0 anyway; should we check/worry about it?
 //
 
 const objc_class_t = {
@@ -126,6 +129,7 @@ const objc_selector_t = {
 };
 
 
+// TO DO: move this to ./block.js?
 const objc_unknownblock_t = { // caution: this is a pointer to an ObjC block whose actual type is unknown (blocks can't be usefully introspected from ObjC - their type is always `@?` - so their argument and return types must be manually defined or obtained via bridgesupport); thus it will accept an existing Block but currently cannot return one; TO DO: modify Block's implementation to allow argument and return types to be supplied separately, after the Block is constructed // TO DO: merge this into ./block.js (which should be named blocktype) as ObjCBlockType
   name: 'objc_unknownblock_t',
   size: ref.sizeof.pointer,
@@ -146,24 +150,34 @@ const objc_unknownblock_t = { // caution: this is a pointer to an ObjC block who
 };
 
 
-
-
-
-
 class ObjCRefType {
+  // a ref-napi compatible type definition for an ObjC pointer
+  //
+  // Note: whereas ref-napi constructs a pointer value using:
+  // 
+  //  const ptr = ref.alloc(TYPE[,VALUE]).ref()
+  //
+  // objc uses:
+  //
+  //  const ptr = new objc.Ref([VALUE])
+  //
+  // This does not require a ref-napi type definition to construct it; instead, the Ref's type - an instance of ObjCRefType - is created and attached to it when it is passed as an argument to/returned as a result from an ObjC method.
+  //
+  // (While a ref-napi pointer value can also be created and passed to an ObjC method, it is up to the user to ensure it is of the correct type; the objc bridge cannot check it and the ObjC runtime will crash if it is not.)
   
   constructor(type) {
-    this.reftype = type;
+    // type : object -- a ref-napi compatible type definition, most often `objc_instance_t` (e.g. when constructing `NSError**` out arguments) though can be any ref-napi compatible type object
+    this.reftype = type; // TO DO: make this private and add `get reftype()` for safety? or just apply Object.freeze()? (Q. does ref-napi bother to freeze its own type objects, or are they left mutable and user is entrusted not to bork them?)
     this.size = ref.sizeof.pointer;
     this.alignment = ref.alignof.pointer;
     this.ffi_type = ffi.FFI_TYPES.pointer;
     this.indirection = 1;
   }
   
-  get name() { return `${this.reftype.name || 'void'}*`; }
+  get name() { return `${this.reftype.name || 'void'}*`; } // TO DO: is this appropriate syntax? (it is not the syntax used by ObjC encoding strings, but ref.types.TYPE.name); TO DO: should we standardize on `objcName` for our own preferred names (e.g. 'CGPoint')
   
   [util.inspect.custom]() {
-    return `{ObjCRefType name: '${this.name}'}`;
+    return `[ObjCRefType name: '${this.name}']`;
   }
   
   get(buffer, offset) { // TO DO: what should we do with offset?
@@ -191,10 +205,14 @@ class ObjCRefType {
   }
 }
 
-const objc_inout_t = new ObjCRefType(objc_instance_t);
+
+const objc_inout_t = new ObjCRefType(objc_instance_t); // most commonly used ObjC pointer type, `id*` (e.g. `NSError**`)
 
 
 /******************************************************************************/
+// ObjC type encodings
+//
+// from: https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide
 
 // Table 6-1  Objective-C type encodings
 const _objcTypeEncodings = {
@@ -210,7 +228,7 @@ const _objcTypeEncodings = {
   'Q': ref.types.uint64,
   'f': ref.types.float,
   'd': ref.types.double,
-  'B': ref.types.int8, // A C++ bool or a C99 _Bool
+  'B': ref.types.bool, // A C++ bool or a C99 _Bool
   'v': ref.types.void,
   '*': ref.types.CString,
   
@@ -243,7 +261,13 @@ const _objcTypeQualifiers = {
 };
 
 
-const isNumber = (c) => '1234567890'.includes(c);
+const DIGITS = '1234567890';
+const ALPHA_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const ALPHA_LOWER = 'abcdefghijklmnopqrstuvwxyz';
+
+const IDENTIFIER_FIRST = ALPHA_UPPER + ALPHA_LOWER + '_';
+const IDENTIFIER_REST = IDENTIFIER_FIRST + DIGITS;
+
 
 
 class ObjCTypeEncodingParser {
@@ -253,11 +277,11 @@ class ObjCTypeEncodingParser {
   get currentToken() { return this.encoding[this.cursor]; }
   get nextToken() { return this.encoding[this.cursor + 1]; }
   
-  //
+  // read... methods consume a portion of the encoding string starting at current token
   
-  parseSize() {
+  readSize() {
     let size = '';
-    while (isNumber(this.currentToken)) {
+    while (DIGITS.includes(this.currentToken)) {
       size += this.currentToken;
       this.cursor++;
     }
@@ -265,61 +289,123 @@ class ObjCTypeEncodingParser {
     return parseInt(size);
   }
   
+  readName() {
+    let token, name = this.currentToken;
+    if (!IDENTIFIER_FIRST.includes(name)) { throw new Error(`Bad identifier in: '${this.encoding}'`); }
+    this.cursor++;
+    while ((token = this.currentToken) && IDENTIFIER_REST.includes(token)) {
+      name += token;
+      this.cursor++;
+    }
+    return name;
+  }
   
-  parseArrayType() { // e.g. [12^f] = an array of 12 pointers to float
-    const size = this.parseSize();
-    const type = this.parseType();
+  readQuotedName() {
+    this.cursor++; // step over opening '"'
+    const name = this.readName();
+    if (this.currentToken !== '"') {
+      throw new Error(`Bad quoted name; expected '"', got '${this.currentToken}' at character ${this.cursor} in: '${this.encoding}'`);
+    }
+    this.cursor++; // step over closing '"'
+    return name;
+  }
+  
+  readArrayType() { // e.g. [12^f] = an array of 12 pointers to float
+    const size = this.readSize();
+    const type = this.readType();
     if (this.currentToken !== ']') { throw new Error(`Bad array encoding in: '${this.encoding}'`); }
     this.cursor++; // step over closing ']'
+    // TO DO: use ref-napi-array to create new [ObjC]ArrayType
     return pointerType; // TO DO: temporary
   }
   
-  parseStructOrUnionType(endToken) {
-    /*
-    Structures are specified within braces, and unions within parentheses. The structure tag is listed first, followed by an equal sign and the codes for the fields of the structure listed in sequence. For example, the structure:
+  /*
+  Structures are specified within braces, and unions within parentheses. The structure tag is listed first, followed by an equal sign and the codes for the fields of the structure listed in sequence. For example, the structure:
+  
+    typedef struct example {
+      id   anObject;
+      char *aString;
+      int  anInt;
+    } Example;
+
+    would be encoded like this:
+
+      {example=@*i}
+
+    The same encoding results whether the defined type name (Example) or the structure tag (example) is passed to @encode(). The encoding for a structure pointer carries the same amount of information about the structure’s fields:
+
+      ^{example=@*i}
+
+    However, another level of indirection removes the internal type specification:
+
+      ^^{example}
+  */
+  readStructType() {
+    // parses an ObjC struct encoding, e.g. '{CGRect="origin"{CGPoint}"size"{CGSize}}'
     
-      typedef struct example {
-        id   anObject;
-        char *aString;
-        int  anInt;
-      } Example;
-
-      would be encoded like this:
-
-        {example=@*i}
-
-      The same encoding results whether the defined type name (Example) or the structure tag (example) is passed to @encode(). The encoding for a structure pointer carries the same amount of information about the structure’s fields:
-
-        ^{example=@*i}
-
-      However, another level of indirection removes the internal type specification:
-
-        ^^{example}
-    */
-    let name = '';
-    while (this.currentToken.match(/0-9A-Za-z_/)) {
-      name += this.currentToken;
-      this.cursor++;
-    }
+    // IMPORTANT: this method not only parses the encoding string, it also gets and sets the StructType cache in objcstruct; this allows it to handle recursive definitions and to look up name-only encodings, e.g. parsing `{CGSize}` will return the type definition for `CGSize`
+    
+    if (!objcstruct) { objcstruct = require('./objcstruct'); }
+    let type;
+    const startIndex = this.cursor - 1; // caller already stepped over '{'
+    const name = this.readName(); // type name is required (without it, the encoding would be ambiguous, e.g. `{Bi}`)
     if (this.currentToken === '=') {
-      this.cursor++;
-      const types = [];
-      while (this.currentToken) {
-        types.push(this.parseType());
+      this.cursor++; // step over '='
+      type = objcstruct.ObjCStructType(); // eslint-disable-line new-cap
+      type.objcName = name; // note: StructType's name is read-only
+      let count = 0;
+      while (this.currentToken && this.currentToken !== '}') {
+        let propertyName = null;
+        if (this.currentToken === '"') { // member name
+          propertyName = this.readQuotedName();
+        }
+          //console.log(`${name}: read quoted name: '${propertyName}'`)
+        const propertyType = this.readType();
+        type.defineProperty(propertyName || `\$${count}`, propertyType); // if no name given, use `$0`, `$1`, etc; TO DO: problem with this is it doesn't match correct fields in object 
+        count++;
       }
+      if (this.currentToken !== '}') { 
+        throw new Error(`Bad struct encoding: expected '}', got '${this.currentToken}' in '${this.encoding}'`);
+      }
+      this.cursor++; // step over closing '}'/')'
+      
+      const structEncoding = this.encoding.slice(startIndex, this.cursor);
+      const existingType = objcstruct.getStructTypeByName(name);
+      
+      
+      if (!existingType || existingType.objcEncoding.length < structEncoding) { // kludge; we want the most detailed definition to be kept; TO DO: e.g. 'substringWithRange:' has encoding '@32@0:8{_NSRange=QQ}16', which is not full _NSRange encoding
+      
+        type.objcEncoding = structEncoding;
+        objcstruct.addStructType(type); // add this new StructType to objcstruct's cache
+      
+      } else { // there's already a full encoding
+        objcstruct.aliasStructType(existingType, structEncoding);
+        type = existingType;
+      }
+      
+    } else if (this.currentToken === '}') { // name-only struct `{NAME}`; note: while name-only encodings are useless for creating a new ObjCStructType, they can appear in other types' encoding strings; for now, a struct type must be fully defined before it can be referenced by another encoding // TO DO: need to support out-of-order definitions as, unlike C header files, bridgesupport files are not guaranteed to define types in order of dependency
+      this.cursor++; // step over closing '}'/')'
+      type = objcstruct.getStructTypeByName(name);
+      if (!type) { throw new Error(`Struct encoding referenced undefined '${name}' struct type: '${this.encoding}'`); }
+    } else {
+      throw new Error(`Bad struct encoding: expected '}', got '${this.currentToken}' in '${this.encoding}'`);
     }
-    if (this.currentToken !== endToken) { 
-      throw new Error(`Bad ${endToken === '}' ? 'struct' : 'union'} encoding in: '${this.encoding}'`);
-    }
-    this.cursor++; // step over closing '}'/')'
-    return pointerType; // TO DO: temporary
+  //    console.log(`parsed: '${type.objcEncoding}'`)
+    return type;
   }
-    
+  
+  /*
+  
+  */
+  readUnionType() {
+    throw new Error('TO DO: readUnionType');
+  }
+  
   //
    
-  parseType() {
+  readType() {
     let token, type, indirection = 0;
-    while (_objcTypeQualifiers[token = this.currentToken] !== undefined) { this.cursor++; } // skip qualifiers
+    while (_objcTypeQualifiers[(token = this.currentToken)] !== undefined) { this.cursor++; } // skip qualifiers
     while (token === '^') {
       indirection++;
       this.cursor++;
@@ -345,50 +431,52 @@ class ObjCTypeEncodingParser {
         }
         break;
       case '[':
-        type = this.parseArrayType();
+        type = this.readArrayType();
         break;
       case '{':
-        type = this.parseStructOrUnionType('}');
+        type = this.readStructType();
         break;
       case '(':
-        type = this.parseStructOrUnionType(')');
+        type = this.readUnionType();
         break;
       case 'b':
-        const size = this.parseSize();
+        const size = this.readSize();
         throw new Error("TO DO: return bitfield type");
         break;
       default:
-        const token = token === undefined ? 'end of string' : `'${token}'`;
-        throw new Error(`Bad type encoding: unexpected ${token} in '${this.encoding}'`);
+        token = (token === undefined) ? 'end of string' : `'${token}'`;
+        throw new Error(`Bad type encoding: unexpected ${token} at character ${this.cursor} in '${this.encoding}'`);
       }
     }
-    while (isNumber(this.currentToken)) { this.cursor++; } // skip #bits offset
+    while ('1234567890'.includes(this.currentToken)) { this.cursor++; } // skip #bits offset
     if (indirection > 0) { type = new ObjCRefType(type, indirection); }
     return type; // cursor is positioned on first character of next type (or undefined if end of encoding)
   }
   
-  //
+  // public API: parse methods consume a complete encoding string and return a type object or array of type objects
 
-  parse(encoding) {
-    // parse a single type encoding, e.g. "o^@"
-    // encoding : string -- ObjC type encoding
-    // Result: object -- ref-napi compatible type definition
+  parseType(encoding) {
+    // parse a single ObjC type encoding
+    // encoding : string -- an ObjC type encoding string, e.g. "o^@"
+    // Result: object -- a ref-napi compatible type definition, suitable for use in ffi-napi
+    // e.g. .bridgesupport files normally define each argument/member separately so use parseType() for those
     this.encoding = encoding;
     this.cursor = 0;
-    let type = this.parseType();
+    let type = this.readType();
     if (this.cursor !== this.encoding.length) { throw new Error(`Bad type encoding '${encoding}'`); }
     return type;
   }
 
   parseTypes(encoding) {
-    // parse one or more encoding, e.g. "o^@"
-    // encoding : string -- ObjC type encoding
-    // Result: [object] -- one or more ref-napi compatible type definitions
+    // parse a sequence of one or more ObjC type encodings; typically a method, struct, or block’s type
+    // encoding : string -- an ObjC type encoding string, e.g. "@:@io^@"
+    // Result: [object,...] -- one or more ref-napi compatible type definitions, suitable for use in ffi-napi
+    // e.g. method signatures obtained via ObjC's introspection APIs
     this.encoding = encoding;
     this.cursor = 0;
     const types = [];
     do {
-      types.push(this.parseType());
+      types.push(this.readType());
     } while (this.currentToken);
     return types;
   }
@@ -444,6 +532,9 @@ const introspectMethod = (object, methodName) => {
   const encoding = runtime.method_getTypeEncoding(method);
   const argTypes = typeParser.parseTypes(encoding); // [result, target, selector,...arguments]
   const returnType = argTypes.shift();
+  
+//  console.log('>>>>', selectorName, encoding, argTypes[2])
+  
   // TO DO: stripped down encoders for first 2 arguments, and always pass ptrs for those to msgSend
   argTypes[0] = pointerType;
   argTypes[1] = pointerType;
@@ -465,8 +556,20 @@ const introspectMethod = (object, methodName) => {
 
 /******************************************************************************/
 
+// DEBUG: performance test
+let _totaltime = process.hrtime.bigint();
+let _zero = _totaltime - _totaltime;
+_totaltime = _zero;
+
+
 
 module.exports = Object.assign({
+  
+  typeParser,
+  
+  // DEBUG: performance test
+  reset: () => _totaltime = _zero,
+  totaltime: () => _totaltime,
   
   // aliases
   NSInteger: ref.types.int64,
@@ -490,5 +593,37 @@ module.exports = Object.assign({
   [util.inspect.custom]: (depth, inspectOptions, inspect) => `{\n\t${Object.keys(module.exports).join(',\n\t')}\n}`, // TO DO: allow a custom 'detail' flag ('low'/'medium'/'high') in inspectOptions, that switches between returning '[object objctypes]', '{void,int8,uint8,etc}', or the full object representation (the standard util.inspect behavior); with 'medium' or 'low' as the default setting; see also ./runtime.js; this should cut down on unhelpful noise being displayed to users (most of whom will rarely need to use types or runtime modules), while still allowing full inspection for troubleshooting purposes
   
 }, ref.types);
+
+
+
+// DEBUG: performance test
+var _depth = 0;
+
+function timer(fn) {
+  return (...args) => {
+    let res;
+    if (!_depth) {
+      _totaltime -= process.hrtime.bigint();
+    }
+      _depth++;
+    try {
+      res = fn(...args);
+    } finally {
+      _depth--;
+    }
+    if (!_depth) {
+      _totaltime += process.hrtime.bigint();
+    }
+    return res;
+  }
+}
+
+for (let k in module.exports) {
+  const v = module.exports[k];
+  if (v && v.indirection !== undefined) {
+    module.exports[k].get = timer(v.get);
+    module.exports[k].set = timer(v.set);
+  }
+}
 
 

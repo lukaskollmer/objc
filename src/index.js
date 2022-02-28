@@ -7,16 +7,18 @@
 const util = require('util');
 
 const constants = require('./constants');
+
 const runtime = require('./runtime');
 const instance = require('./instance');
-const {ns, js} = require('./codecs').initialize(); // codecs cannot be initialized until './instance' has been fully imported // TO DO: can/should instance.js make this call after its module.exports is defined?
-const ObjCRef = require('./objcref');
-const objctypes = require('./objctypes');
-
-const Block = require('./block');
 const Selector = require('./selector');
+
+const {ns, js} = require('./codecs').initialize(); // codecs cannot be initialized until './instance' has been fully imported // TO DO: can/should instance.js make this call after its module.exports is defined?
+const objctypes = require('./objctypes');
+const {structs} = require('./objcstruct');
+const ObjCRef = require('./objcref');
+const Block = require('./block');
+
 const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
-const {defineStruct} = require('./structs');
 
 instance.swizzle = require('./swizzle');
 
@@ -57,22 +59,22 @@ module.exports = new Proxy({
   
   // creating ObjC-specific types
   // note: use objc.__internal__.types to access napi-ref-compatible type objects currently used by Block, Selector, etc (moving it there reduces top-level noise in objc namespace, and it is lower-level technical stuff for use in ffi-napi); TO DO: if/when .bridgesupport is implemented, users should almost never need to define Struct types, or C function or Block argument/result types manually (hence `objc.__internal__.types`, not `objc.types`, in anticipation of this); FWIW, once ObjC type encoding parser can read full signatures, we should probably just use that for user-defined Structs, Blocks, NSObject subclasses too: the overhead of parsing those strings into ref-napi types will be minimal and ObjC type strings are probably easier to write than ref-napi code
-  Block,
-  Ref: ObjCRef,
-  Selector,
+  
+  structs, // use `objc.structs.define(ENCODING)` to define new ObjC struct types, and `new objc.structs.NAME(...)` to create instances of a struct
+  
+  Block, // TO DO: replace this with objc.blocks, using `objc.blocks.define(ENCODING[,NAME])` to define block types and `new objc.blocks.NAME(callback)` to instantiate them
+  
+  Ref: ObjCRef, // use `new objc.Ref([VALUE])` to create pointer values to pass as inout/out arguments to methods
+  
+  Selector, // use `new Selector(NAME)` to create a new ObjC selector using NS-style method name, e.g. `new Selector("foo:barBaz:")`; this is equivalent to `@selector(NAME)` in ObjC
   
   
-  NSRange: defineStruct('_NSRange', { // TO DO: check this (Q. why is struct name prefixed?)
-    location: objctypes.NSUInteger,
-    length: objctypes.NSUInteger,
-  }), 
+  
   
   [util.inspect.custom]: (depth, inspectOptions, inspect) => { // called by console.log(objc)
     return '[object objc]'; // TO DO: opaque/shallow/deep inspection options (bear in mind that inspecting the `objc` object will only show hardcoded members, and maybe already-imported objects if we make it smart enough to list those too)
   },
     
-  
-  defineStruct, // TO DO: how/where should type constructors be presented? e.g. createClass, defineStruct, and Block will all need objctypes; also, their names and instantiation processes are all inconsistent
   
   createClass, // TBD
   

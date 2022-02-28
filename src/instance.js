@@ -12,6 +12,8 @@
 
 // TO DO: wrap NSArray (and NSDictionary?) instances in custom Proxy objects that implement standard JS Array/Object APIs in addition to ObjC instance methods; this would allow a degree of polymorphism, reducing need to explicitly unpack (with added caveat that proxies around mutable NS objects probably can't cache unpacked items as the NS object's contents may change at any time)
 
+// TO DO: FIX: NSAppleEventDescriptor in `<${desc}>` expands to '<true>', which is wrong!
+
 
 const util = require('util');
 
@@ -92,6 +94,13 @@ const wrapInstance = ptr => {
 }
 
 
+// DEBUG: performance test
+let _totaltime = process.hrtime.bigint();
+let _zero = _totaltime - _totaltime;
+_totaltime = _zero;
+
+
+
 const wrapMethod = (objcObject, methodDefinition) => {
   // create a method wrapper bound to a ObjCClass/ObjCInstance
   // objcObject : ObjCObject -- the ObjCClass/ObjCInstance to which this method belongs
@@ -106,9 +115,11 @@ const wrapMethod = (objcObject, methodDefinition) => {
   //
   return function callObjCMethod(...args) { // ideally closure would be named after methodDefinition.methodName, but that's tricky; TO DO: we probably could attach a custom inspect that will display method name and argument types
     //console.log('>>callObjCMethod: '+methodDefinition.selector.name)
-    //let t = process.hrtime.bigint()
     try {
+      let t = process.hrtime.bigint(); // DEBUG: performance test
       let retval = methodDefinition.msgSend(objcObject.ptr, methodDefinition.sel, ...args);
+      _totaltime += process.hrtime.bigint() - t; // DEBUG: performance test
+      
       // update any inout/out arguments (ObjCRefType.set attached before and after pointers and type info)
       if (methodDefinition.inoutIndexes) {
         for (let i of methodDefinition.inoutIndexes) {
@@ -526,6 +537,9 @@ const isWrappedObjCInstance = object => {
 
 
 module.exports = {
+
+  reset: () => _totaltime = _zero, // DEBUG: performance test
+  totaltime: () => _totaltime, // DEBUG: performance test
 
   // important: external callers must always use `wrapClass`/`wrapInstance`/`wrap` to convert an ObjC object ptr to a correctly wrapped ObjCClass/ObjCInstance, and ensure its class is correctly registed in the internal cache
   getClassByName,

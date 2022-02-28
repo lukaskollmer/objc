@@ -186,13 +186,16 @@ ObjC constants are returned as objc objects.
 
 ### Structs
 
-_TO DO: currently broken_
+Use `objc.structs.define(encoding)` function to define a struct by its name and layout. The resulting `StructType` is available as `objc.structs.NAME`. It is also compatible with the `ffi-napi`, `ref-napi`, `ref-struct-di` modules.
 
-Use the `objc.defineStruct` function to define a struct by its name and layout. The returned type can be used to create instances of the struct, and when specifying type encodings in the `objc` module. It is also compatible with the `ffi-napi`, `ref-napi`, `ref-struct-di` modules.
+The `objc` module already provides definitions for the following:
 
-You can use the `StructType.new` function to create an instance of the struct. Optionally, you can pass values to populate the struct.
+* `NSPoint`
+* `NSSize`
+* `NSRect`
+* `NSRange`
 
-The `objc` module already provides a definition for `NSRange`, accessible as `objc.NSRange`.
+Use `new StructType(OBJECT)` to create an instance of the struct, passing an object to populate the struct. (Note: missing fields are set to `0`/`null`.)
 
 **Example:** Using structs with objc methods
 
@@ -200,7 +203,7 @@ The `objc` module already provides a definition for `NSRange`, accessible as `ob
 const objc = require('objc');
 
 const string = objc.ns('Hello World');
-const substring = string.substringWithRange_(objc.NSRange.new(0, 5));
+const substring = string.substringWithRange_(new objc.structs.NSRange({location: 0, length: 5}));
 // -> 'Hello'
 ```
 

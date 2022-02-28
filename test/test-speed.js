@@ -1,4 +1,6 @@
-#!/usr/bin/env node 
+#!/usr/bin/env node
+
+
 
 const objc = require('objc')
 
@@ -13,12 +15,25 @@ console.log()
 
 // objc.NSAppleScriptErrorAppName
 
-
-let i, n = 10//00 // currently does 1K repeat calls in ~0.15sec, which is slow but usable; however, there is still significant overhead when converting argument and return values, operations which themselves involve calling multiple ObjC methods - currently each of those method invocations also goes through the full objc bridge, but since there's only a handful of standard JS types to bridge we could bypass the wrappers and use raw pointers to their corresponding ObjC classes, instances, and methods directly in ffi)
-
-let b = true
+objc.__internal__.types.reset()
+objc.__internal__.reset()
 
 let t = process.hrtime.bigint()
+
+/*
+
+10K calls:
+
+TOTAL1.656526795sec
+FFI: 1.620336908sec // time spend in ref-ffi ForeignFunction(...), including in codecs
+REF: 0.90476087sec // time spent in ref-napi get(...) and set(...) codecs
+
+*/
+
+
+let i, n = 10000 // currently does 1K repeat calls in ~0.15sec, which is slow but usable; however, there is still significant overhead when converting argument and return values, operations which themselves involve calling multiple ObjC methods - currently each of those method invocations also goes through the full objc bridge, but since there's only a handful of standard JS types to bridge we could bypass the wrappers and use raw pointers to their corresponding ObjC classes, instances, and methods directly in ffi) -- this is still 10x slower than ffi-napi's factorial example
+
+let b = true
 
 for (i=0;i<n;i++) {
 	v = objc.NSString.stringWithString_(v) //`S${i}`)
@@ -26,8 +41,11 @@ for (i=0;i<n;i++) {
 	//console.log()
 }
 
-console.log('J: '+(Number(process.hrtime.bigint() - t)/1e9)+'sec')
+console.log('TOTAL'+(Number(process.hrtime.bigint() - t)/1e9)+'sec')
+console.log('FFI: '+(Number(objc.__internal__.totaltime())/1e9)+'sec')
+console.log('REF: '+(Number(objc.__internal__.types.totaltime())/1e9)+'sec')
 
+/*
 
 console.log(i+' ' + typeof v+' = '+v) // 10000 object = [ObjCInstance __NSCFConstantString]
 
@@ -48,3 +66,4 @@ console.log(arr.description().UTF8String()) // '(\n    one,\n    two,\n    one\n
 let s = arr.componentsJoinedByString_('/')
 
 console.log(objc.js(s)) // 'one/two/one'
+*/

@@ -15,4 +15,5 @@ module.exports = {
   __objcClassPtr: Symbol('__objcClassPtr'), // extract an ObjC Class pointer from its method Proxy
   __objcInstancePtr: Symbol('__objcInstancePtr'), // extract an ObjC instance pointer from its method Proxy
 
+  __objcType: Symbol('__objcType'), // ObjCStructType
 };

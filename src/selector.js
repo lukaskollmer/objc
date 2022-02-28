@@ -14,19 +14,14 @@ const constants = require('./constants');
 const runtime = require('./runtime');
 
 
+// TO DO: should Selector constructor cache new Selector objects for reuse? (this is what ObjC does natively); from JS's POV it might not be that useful (the only benefit might be that it allows Selector objects to be directly compared using `===` operator)
+
 
 class Selector {
   #__ptr;
-
-  constructor(input) { // create a Selector from string (e.g. 'foo:bar:') or existing SEL ptr
-    // caution: this (public) constructor does not type check to ensure the given value is a string/SEL
-    if (constants.isString(input)) {
-      this.#__ptr = runtime.sel_getUid(input);
-    } else {
-      this.#__ptr = input;
-    }
-  }
   
+  // utility functions for converting between NS- and JS-style method names, e.g. `foo:barBaz:` <-> `foo_barBaz_`
+  // (these are attached to Selector 'class' simply to avoid further pollution of top-level `objc` namespace)
   
   static selectorNameFromJS(name) {
     return name.replace(/__?/g, s => s.length === 1 ? ':' : '_'); // TO DO: see TODO above re. resolving remaining ambiguity
@@ -43,10 +38,22 @@ class Selector {
     });
   }
   
+  // constructors
+  
+  constructor(input) { // create a Selector from string (e.g. 'foo:bar:') or existing SEL ptr
+    // caution: this (public) constructor does not type check to ensure the given value is a string/SEL
+    if (constants.isString(input)) {
+      this.#__ptr = runtime.sel_getUid(input);
+    } else {
+      this.#__ptr = input;
+    }
+  }
   
   static fromjs(selectorName) { // create a Selector from JS-style name, e.g. "foo_bar_"
     return new Selector(Selector.selectorNameFromJS(selectorName));
   }
+  
+  // accessors
   
   tojs() { // TO DO: see above TODO re. ambiguity
     // Result: string -- the method's JS (underscore-delimited) name
@@ -62,5 +69,7 @@ class Selector {
   
   get [String.toStringTag]() { `Selector=${this.name}` }
 }
+
+
 
 module.exports = Selector;
