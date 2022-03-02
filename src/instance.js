@@ -22,10 +22,8 @@ const ref = require('ref-napi');
 
 const constants = require('./constants'); 
 const runtime = require('./runtime');
-const {js} = require('./codecs'); // used in toPrimitive
-const Selector = require('./selector');
-const ObjCRef = require('./objcref');
-const Block = require('./block');
+const codecs = require('./codecs'); // used in toPrimitive
+const Reference = require('./reference');
 
 
 /******************************************************************************/
@@ -124,7 +122,7 @@ const wrapMethod = (objcObject, methodDefinition) => {
       if (methodDefinition.inoutIndexes) {
         for (let i of methodDefinition.inoutIndexes) {
           const box = args[i];
-          if (box instanceof ObjCRef && !box.__outptr.equals(box.__inptr)) {
+          if (box instanceof Reference && !box.__outptr.equals(box.__inptr)) {
             // box.__outptr.readPointer().isNull() // TO DO: do we need a NULL check here?
             box.value = box.__reftype.get(box.__outptr, 0, box.__reftype);
           }
@@ -435,12 +433,12 @@ const createMethodProxy = obj => {
         case Symbol.toStringTag: // describes the ObjC object's construction, including presence of method Proxy wrapper; JS will call this when generating its '[object TAG]' representation
           //console.log('calling Proxy[toStringTag]')
           return `Wrapped-${objcObject[Symbol.toStringTag]}`; // TO DO: how best to indicate wrapper's addition? parens/brackets/braces/'wrapped-'?
-        case Symbol.toPrimitive: // caution: while we'd like this switch block to return the ObjCObject's method directly, JS's Here Be Dragons implementation (which might be aided and abetted here by Proxy's own special behavior) means that if we return the toPrimitive method directly, JS treats that method's `this` as now bound to this Proxy, not to the class that actually owns that method; which is to say, at least within the Proxy's implementation, don't grab methods off the proxied objects (in this case the wrapped ObjCObject) and pass them around like closures because, while that sort of thing works perfectly in the likes of Python, JS makes an absolute arse of it
+        case Symbol.toPrimitive:
           // TO DO: for now, only ObjCClass implements its own toPrimitive; once we have optimized NS<->JS converter functions that work on __ptrs directly, ObjCInstance[Symbol.toPrimitive] can use that to convert itself directly, but for now js() needs the method wrapper to work so we have to call it from here
           // TO DO: when determining if a non-boolean object is equivalent to boolean true or false, does JS call toPrimitive? ideally an empty NSString or an NSNumber whose value is False/0/0.0 would also appear false-equivalent to JS; e.g. in Python, objects can implement a 'magic' __bool__ method if they wish to appear as True or False equivalent (any objects that don't implement __bool__ are always equivalent to True), and this is used by PyObjC's NSNumber, NSString, NSArray, and NSDictionary proxies to make those appear False equivalent when 0 or empty (i.e. consistent with its native 0, "", [], and {} values)
             //console.log('returning toPrimitive closure for '+objcObject.constructor.name)
                         
-          return (hint => {
+          return (hint => { // caution: in JS, always return a full closure that lexically binds the underlying object by explicit name (in this case `objcObject`) and doesn't refer to `this` (i.e. don't return `ObjCObject.toPrimitive`, which is tempting and would be logical in other languages such as Python, but in JS will break in use because JS's fragile `this` dynamically rebinds to whatever the function is called in/on, thus returning the return `ObjCObject.toPrimitive` function here, then calling it as `Proxy(ObjCObject)[toPrimitive](...)`, would cause the function to bind the Proxy as `this`, not the underlying ObjCbject, and explode accordingly)
             // hint : 'number' | 'string' | 'default'
             // Result: number | string
             //console.log('...calling toPrimitive('+hint+') closure for '+this.constructor.name+' = '+objcObject[Symbol.toStringTag])
@@ -451,7 +449,7 @@ const createMethodProxy = obj => {
             if (objcObject instanceof ObjCClass) {
               return objcObject.tojs(hint);
             }
-            let obj = js(proxyObject, true); // quick-n-dirty (it is simpler to convert the ObjCInstance to JS value and have JS convert that, rather than go straight from ObjCInstance to JS retval - which would require replicating JS's own convoluted rules here); note: this should be non-strict, as unconvertible values will be turned below; that said, js() will be more efficient once it maps the ObjC ptr for NSString, NSNumber, etc directly to their corresponding JS types, as JS will already be quite efficient at getting those JS objects' string/number representation (although I wonder why it only does those and not 'boolean' too; but…JS)
+            let obj = codecs.js(proxyObject, true); // quick-n-dirty (it is simpler to convert the ObjCInstance to JS value and have JS convert that, rather than go straight from ObjCInstance to JS retval - which would require replicating JS's own convoluted rules here); note: this should be non-strict, as unconvertible values will be turned below; that said, js() will be more efficient once it maps the ObjC ptr for NSString, NSNumber, etc directly to their corresponding JS types, as JS will already be quite efficient at getting those JS objects' string/number representation (although I wonder why it only does those and not 'boolean' too; but…JS)
             //console.log('tried converting to js => '+typeof obj)
             // first, deal with any types that must/can be reduced to numbers...
             if (hint === 'number' || (hint === 'default' && (constants.isBoolean(obj) || constants.isNumber(obj)))) {
@@ -536,35 +534,34 @@ const isWrappedObjCInstance = object => {
 /******************************************************************************/
 
 
-module.exports = {
+// DEBUG: performance test
+module.exports.reset      = () => _totaltime = _zero;
+module.exports.totaltime  = () => _totaltime;
 
-  reset: () => _totaltime = _zero, // DEBUG: performance test
-  totaltime: () => _totaltime, // DEBUG: performance test
+// important: external callers must always use `wrapClass`/`wrapInstance`/`wrap` to convert an ObjC object ptr to a correctly wrapped ObjCClass/ObjCInstance, and ensure its class is correctly registed in the internal cache
 
-  // important: external callers must always use `wrapClass`/`wrapInstance`/`wrap` to convert an ObjC object ptr to a correctly wrapped ObjCClass/ObjCInstance, and ensure its class is correctly registed in the internal cache
-  getClassByName,
-  getClassByPtr,
-  wrap: ptr => (runtime.object_isClass(ptr) ? getClassByPtr(ptr) : wrapInstance(ptr)),
-  wrapClass: getClassByPtr,
-  wrapInstance,
-  
-  createMethodProxy, // used by ./codecs
-  
-  // these internal classes are exported here for [largely internal] type-checking; external code should not instantiate them directly
-  ObjCObject,
-  ObjCClass,
-  ObjCInstance,
-  
-  // note: these type-checking functions check for an ObjCObject that is wrapped in its method Proxy, which is what user code should normally interact with (users should not interact with the unwrapped objects, C ptrs, etc unless they really know what they're doing and why they need to do it)
-  // e.g. to check for an unwrapped ObjCInstance: `(object instanceof ObjCInstance && !isWrappedObjCInstance(object))`
-  isWrappedObjCObject,
-  isWrappedObjCClass,
-  isWrappedObjCInstance,
-  
-  keyObjCObject: constants.__objcObject, // symbol key for extracting an ObjCObject from its method Proxy wrapper
-  
-  // objc exports instance module as objc.__internal__, so export low-level runtime and types modules on that
-  runtime,
-  
-  [util.inspect.custom]: (depth, inspectOptions, inspect) => '[object objc.__internal__]',
-};
+module.exports.getClassByName = getClassByName;
+module.exports.getClassByPtr = getClassByPtr;
+module.exports.wrap = (ptr) => (runtime.object_isClass(ptr) ? getClassByPtr(ptr) : wrapInstance(ptr));
+module.exports.wrapClass = getClassByPtr;
+module.exports.wrapInstance = wrapInstance;
+
+module.exports.createMethodProxy = createMethodProxy; // used by ./codecs
+
+// these internal classes are exported here for [largely internal] type-checking; external code should not instantiate them directly
+// e.g. to check for an unwrapped ObjCInstance: `(object instanceof ObjCInstance && !isWrappedObjCInstance(object))`
+module.exports.ObjCObject = ObjCObject;
+module.exports.ObjCClass = ObjCClass;
+module.exports.ObjCInstance = ObjCInstance;
+
+// note: these type-checking functions check for an ObjCObject that is wrapped in its method Proxy, which is what user code should normally interact with (users should not interact with the unwrapped objects, C ptrs, etc unless they really know what they're doing and why they need to do it)
+module.exports.isWrappedObjCObject = isWrappedObjCObject;
+module.exports.isWrappedObjCClass = isWrappedObjCClass;
+module.exports.isWrappedObjCInstance = isWrappedObjCInstance;
+module.exports.keyObjCObject = constants.__objcObject; // key for extracting an ObjCObject from its method Proxy wrapper
+
+// objc exports instance module as objc.__internal__, so export low-level runtime and types modules on that
+module.exports.runtime = runtime;
+module.exports[util.inspect.custom] = (depth, inspectOptions, inspect) => '[object objc.__internal__]';
+
+

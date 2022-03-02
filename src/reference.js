@@ -1,4 +1,4 @@
-// ObjCRef -- use with ObjC class and instance methods that return-by-argument
+// Reference -- use with ObjC class and instance methods that return-by-argument
 
 // notes:
 //
@@ -12,7 +12,7 @@
 // inout argument
 
 
-class ObjCRef {
+class Reference {
 	#value;
 	__inptr; __outptr; __reftype; // used internally by objctypes to update out arguments
 	
@@ -36,5 +36,5 @@ class ObjCRef {
 
 
 
-module.exports = ObjCRef;
+module.exports = Reference;
 

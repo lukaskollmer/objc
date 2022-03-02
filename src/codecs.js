@@ -258,5 +258,7 @@ const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = fals
 /******************************************************************************/
 
 
-module.exports = {initialize, ns, js};
+module.exports.initialize = initialize;
+module.exports.ns = ns;
+module.exports.js = js;
 

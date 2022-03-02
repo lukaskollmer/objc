@@ -2,19 +2,34 @@
 
 const objc = require('../src/index');
 
-const {wrap, types} = objc.__internal__;
 
-const array = objc.ns(['i', 'am', 'the', 'doctor']);
+// an NSComparator block takes 3 ObjC objects ('@') as arguments: the block itself plus 2 values to compare), and returns an NSComparisonResult (an Int64-based enum, 'q')
 
-const longestToShortest = new objc.Block(
-  (arg0, arg1) => {
-    // arg0 and arg1 are ObjC instance ptrs // TO DO: Block should automatically wrap these
-    arg0 = wrap(arg0);
-    arg1 = wrap(arg1);
-    return arg0.length() > arg1.length() ? -1 : 1;
-  },
-  types.NSInteger, [types.id, types.id]); // return and argument types
+// define the NSComparator type, using its ObjC type encoding string (naming the type is optional, but recommended)
+objc.blocks.define('q@@@', 'NSComparator');
 
-const sorted = array.sortedArrayUsingComparator_(longestToShortest);
-console.log(sorted); // [objc: ( doctor, the, am, i )]
+// once the type is defined, it can be referred to by its name...
+console.log(objc.blocks.NSComparator); // [class NSComparator extends Block]
+
+
+// ...and new Block objects of that type created for use as arguments to ObjC methods:
+
+const array = objc.ns(['i','can','hold','up','TWO','books']);
+
+
+const longestToShortest = new objc.blocks.NSComparator(
+								  (thing1, thing2) => {
+									return thing1.length() < thing2.length() ? -1 : +1;
+								  });
+
+console.log(array.sortedArrayUsingComparator_(longestToShortest)); // [objc ( books, hold, TWO, can, up, i )]
+
+
+
+const shortestToLongest = new objc.blocks.NSComparator(
+								  (thing1, thing2) => {
+									return thing1.length() < thing2.length() ? -1 : +1;
+								  });
+
+console.log(array.sortedArrayUsingComparator_(shortestToLongest)); // [objc ( i, up, TWO, can, hold, books )]
 

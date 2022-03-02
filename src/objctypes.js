@@ -26,14 +26,16 @@ const ffi = require('ffi-napi');
 const ref = require('ref-napi');
 
 const constants = require('./constants');
-const Block = require('./block');
+
+const Reference = require('./reference');
+const Selector = require('./selector');
+const objcblock = require('./block');
+const objcstruct = require('./struct');
+
 const instance = require('./instance');
 const runtime = require('./runtime');
-const Selector = require('./selector');
-const ObjCRef = require('./objcref');
-const {ns} = require('./codecs');
+const codecs = require('./codecs');
 
-let objcstruct = null; // lazily loaded by parser due to circular reference between objctypes and objcstruct
 
 const pointerType = ref.refType(ref.types.void);
 
@@ -41,13 +43,14 @@ const pointerType = ref.refType(ref.types.void);
 /******************************************************************************/
 // ref-napi compatible type definitions for wrapping and unwrapping ObjC objects
 //
+// (these should be fully interchangeable with ref-napi's ref.types.TYPE objects)
+//
 // Important: `Class` and `id` types are themselves *always* pointers to an ObjC structure, e.g. `NSString*` is a sub-type of `id`. There is no way to allocate an ObjC class instance directly on the stack, as can be done with C++. Therefore a `ref.refType(TYPE)` call should only be applied when creating a pointer to that pointer, e.g. `NSError**`, and even then it is normally more convenient (and robust) to use objc's `Ref` instead.
 //
 //
 // note: when TYPE.indirection===1, ffi.ForeignFunction calls TYPE.set/get() to convert the given data to/from C (this is counterintuitive, but ffi treats 0 as an error along with other falsy values)
 //
-// TO DO: these (atomic) types ignore any `offset` argument as it should always be 0 anyway; should we check/worry about it?
-//
+
 
 const objc_class_t = {
   name: 'objc_class_t',
@@ -56,14 +59,14 @@ const objc_class_t = {
   ffi_type: ffi.FFI_TYPES.pointer,
   indirection: 1, 
   get: (buffer, offset) => { // e.g. ffi.ForeignFunction calls to wrap result
-    const ptr = buffer.readPointer();
+    const ptr = ref.readPointer(buffer, offset || 0);
     return ptr.isNull() ? null : instance.wrapClass(ptr);
   },
   set: (buffer, offset, value) => { // e.g. ffi.ForeignFunction calls to unwrap argument
     if (!instance.isWrappedObjCClass(value)) {
       throw new TypeError(`Expected an ObjC class but received ${typeof value}: ${value}`);
     }
-    ref.writePointer(buffer, 0, value[instance.keyObjCObject].ptr);
+    ref.writePointer(buffer, offset || 0, value[instance.keyObjCObject].ptr);
   },
 };
 
@@ -75,7 +78,7 @@ const objc_instance_t = {
   ffi_type: ffi.FFI_TYPES.pointer,
   indirection: 1,
   get: (buffer, offset) => {
-    const ptr = buffer.readPointer();
+    const ptr = ref.readPointer(buffer, offset || 0);
     return ptr.isNull() ? null : instance.wrap(ptr);
   },
   set: (buffer, offset, value) => {
@@ -92,11 +95,11 @@ const objc_instance_t = {
       console.log('WARN: objc_instance_t.set received a raw Buffer');
       ptr = value;
     } else {
-      ptr = ns(value, (value) => {
+      ptr = codecs.ns(value, (value) => {
         throw new TypeError(`Expected an ObjC instance or null but received ${typeof value}: ${util.inspect(value)}`);
       }, true);
     }
-    ref.writePointer(buffer, 0, ptr);
+    ref.writePointer(buffer, offset || 0, ptr);
   },
 };
 
@@ -108,7 +111,7 @@ const objc_selector_t = {
   ffi_type: ffi.FFI_TYPES.pointer,
   indirection: 1,
   get: (buffer, offset) => {
-    const ptr = buffer.readPointer();
+    const ptr = ref.readPointer(buffer, offset || 0);
     return ptr.isNull() ? null : new Selector(ptr);
   },
   set: (buffer, offset, value) => {
@@ -124,28 +127,27 @@ const objc_selector_t = {
     } else {
       throw new TypeError(`Expected an ObjC Selector but received ${typeof value}: ${value}`);
     }
-    ref.writePointer(buffer, 0, ptr);
+    ref.writePointer(buffer, offset || 0, ptr);
   },
 };
 
 
-// TO DO: move this to ./block.js?
-const objc_unknownblock_t = { // caution: this is a pointer to an ObjC block whose actual type is unknown (blocks can't be usefully introspected from ObjC - their type is always `@?` - so their argument and return types must be manually defined or obtained via bridgesupport); thus it will accept an existing Block but currently cannot return one; TO DO: modify Block's implementation to allow argument and return types to be supplied separately, after the Block is constructed // TO DO: merge this into ./block.js (which should be named blocktype) as ObjCBlockType
-  name: 'objc_unknownblock_t',
+const objc_opaqueblock_t = { // TO DO: move this to ./block.js?
+  name: 'objc_opaqueblock_t',
   size: ref.sizeof.pointer,
   alignment: ref.alignof.pointer,
   ffi_type: ffi.FFI_TYPES.pointer,
   indirection: 1,
   get: (buffer, offset) => {
-    //const ptr = buffer.readPointer();
-    //return ptr.isNull() ? null : new Block(ptr);
+    //const ptr = ref.readPointer(buffer, offset || 0);
+    //return ptr.isNull() ? null : new Block(ptr); // TO DO: this is close: we just need to create the Block using objc_opaqueblock_t as its type
     throw new Error(`Can't get ObjC Block as its type is unknown.`); // TO DO: see above TODO
   },
   set: (buffer, offset, value) => {
-    if (!(value instanceof Block)) {
-      throw new TypeError(`Expected an ObjC Block but received ${typeof value}: ${value}`);
+    if (!(value instanceof objcblock.Block)) {
+      throw new TypeError(`Expected ObjC Block but received ${typeof value}: ${value}`);
     }
-    ref.writePointer(buffer, 0, value.ptr);
+    ref.writePointer(buffer, offset || 0, value.ptr);
   },
 };
 
@@ -181,16 +183,16 @@ class ObjCRefType {
   }
   
   get(buffer, offset) { // TO DO: what should we do with offset?
-    const value = this.reftype.get(buffer.deref(), offset, this.reftype);
-    return new ObjCRef(value);
+    const value = this.reftype.get(buffer.deref(), offset, this.reftype); // TO DO: fragile `this` assumes that ref-ffi and other APIs which use ref.types will never separate get/set functions (methods in this case) from their containing object (if there is a possibility they could/do then switch back to traditional protypal `function(...){...}` syntax, as that can use explicit name binding instead of `this` to reliably close over object state within method functions)
+    return new Reference(value);
   }
   
   set(buffer, offset, value) { // TO DO: what should we do with offset?
     let ptr;
-    if (value instanceof ObjCRef) {
+    if (value instanceof Reference) {
       ptr = ref.alloc(pointerType);
       this.reftype.set(ptr, offset, value.value, this.reftype);
-      // attach [copy of] ptr to ObjCRef, so that method wrapper can check if it has changed and rewrap if it has
+      // attach [copy of] ptr to Reference, so that method wrapper can check if it has changed and rewrap if it has
       value.__outptr = ptr;
       value.__inptr = Buffer.from(ptr);
       value.__reftype = this.reftype;
@@ -199,9 +201,9 @@ class ObjCRefType {
     } else if (value instanceof Buffer) { // assume user knows what they're doing // TO DO: we should probably check this for ffi_type (Q. does ref.alloc attach type to buffer?) and confirm indirection level is correct
       ptr = value;
     } else {
-      throw new TypeError(`Expected an ObjCRef or null but received ${typeof value}: ${value}`);
+      throw new TypeError(`Expected an Reference or null but received ${typeof value}: ${value}`);
     }
-    ref.writePointer(buffer, 0, ptr);
+    ref.writePointer(buffer, offset || 0, ptr);
   }
 }
 
@@ -345,12 +347,12 @@ class ObjCTypeEncodingParser {
     
     // IMPORTANT: this method not only parses the encoding string, it also gets and sets the StructType cache in objcstruct; this allows it to handle recursive definitions and to look up name-only encodings, e.g. parsing `{CGSize}` will return the type definition for `CGSize`
     
-    if (!objcstruct) { objcstruct = require('./objcstruct'); }
     let type;
     const startIndex = this.cursor - 1; // caller already stepped over '{'
     const name = this.readName(); // type name is required (without it, the encoding would be ambiguous, e.g. `{Bi}`)
     if (this.currentToken === '=') {
       this.cursor++; // step over '='
+      // TO DO: is this correct, or should it use `new`:
       type = objcstruct.ObjCStructType(); // eslint-disable-line new-cap
       type.objcName = name; // note: StructType's name is read-only
       let count = 0;
@@ -418,7 +420,7 @@ class ObjCTypeEncodingParser {
       case '@':
         if (this.currentToken === '?') { // '@?' is the encoding used for blocks
           this.cursor++;
-          type = objc_block_t;
+          type = objc_opaqueblock_t;
         } else if (indirection === 1) { // commonly 'o^@' argument, e.g. NSError**
           indirection--;
           type = objc_inout_t;
@@ -563,7 +565,7 @@ _totaltime = _zero;
 
 
 
-module.exports = Object.assign({
+Object.assign(module.exports, ref.types, {
   
   typeParser,
   
@@ -582,7 +584,7 @@ module.exports = Object.assign({
   objc_instance_t,
   objc_class_t,
   objc_selector_t,
-  objc_unknownblock_t,
+  objc_opaqueblock_t,
   ObjCRefType, // constructor for ref-napi compatible type that packs and unpacks an objc.Ref
   
   // introspection
@@ -592,11 +594,11 @@ module.exports = Object.assign({
   // shallow inspect this module
   [util.inspect.custom]: (depth, inspectOptions, inspect) => `{\n\t${Object.keys(module.exports).join(',\n\t')}\n}`, // TO DO: allow a custom 'detail' flag ('low'/'medium'/'high') in inspectOptions, that switches between returning '[object objctypes]', '{void,int8,uint8,etc}', or the full object representation (the standard util.inspect behavior); with 'medium' or 'low' as the default setting; see also ./runtime.js; this should cut down on unhelpful noise being displayed to users (most of whom will rarely need to use types or runtime modules), while still allowing full inspection for troubleshooting purposes
   
-}, ref.types);
+});
 
 
 
-// DEBUG: performance test
+// DEBUG: performance test (this should log how much time is spent inside ref.types' get/set functions; with caveat that any calls back into the plumbing will be included in the total, which is not ideal as we're trying to distinguish time taken by code within get/set from time spent in the infrastructure underneath)
 var _depth = 0;
 
 function timer(fn) {

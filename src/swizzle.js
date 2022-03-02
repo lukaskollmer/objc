@@ -23,7 +23,7 @@ const swizzle = (className, selectorName, fn, isClassMethod = false) => {
   
   const swizzledSelector = libobjc.sel_getUid(`xxx__${selectorName}`); // TO DO: swizzled method naming convention? also, should distinguish between class and instance
   
-  const block = block.getBlockType(runtime.method_getTypeEncoding(method)).newBlock(fn);
+  const block = new (block.getBlockTypeForEncoding(runtime.method_getTypeEncoding(method)))(fn);
 
   const success = libobjc.class_addMethod(
     classPtr,

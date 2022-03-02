@@ -10,13 +10,15 @@ const constants = require('./constants');
 
 const runtime = require('./runtime');
 const instance = require('./instance');
+const objctypes = require('./objctypes');
+
+const Reference = require('./reference');
 const Selector = require('./selector');
 
-const {ns, js} = require('./codecs').initialize(); // codecs cannot be initialized until './instance' has been fully imported // TO DO: can/should instance.js make this call after its module.exports is defined?
-const objctypes = require('./objctypes');
-const {structs} = require('./objcstruct');
-const ObjCRef = require('./objcref');
-const Block = require('./block');
+const objcstruct = require('./struct');
+const objcblock = require('./block');
+
+const codecs = require('./codecs').initialize(); // caution: import 'instance' before initializing codecs
 
 const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
 
@@ -41,6 +43,19 @@ const importFramework = name => {
 };
 
 
+/******************************************************************************/
+// predefined struct types
+
+// TO DO: quicker to create these directly, but for now just use encoding strings copied from Foundation.bridgesupport
+
+objcstruct.structs.define('{CGPoint="x"d"y"d}', 'NSPoint');
+objcstruct.structs.define('{CGSize="width"d"height"d}', 'NSSize');
+objcstruct.structs.define('{CGRect="origin"{CGPoint}"size"{CGSize}}', 'NSRect');
+objcstruct.structs.define('{_NSRange="location"Q"length"Q}', 'NSRange');
+
+
+/******************************************************************************/
+
 
 module.exports = new Proxy({
   // TO DO: there's a risk in principle of builtin names masking importable names; do we really need to worry about that in practice though, given that [Obj]C strongly encourages framework devs to prefix all exported names with an ad-hoc namespace (e.g. "NSBlock", not, "Block")? if name masking is a concern, we could use `$NAME` to disambiguate imported names; stripping the leading '$' when doing the actual lookup
@@ -49,8 +64,8 @@ module.exports = new Proxy({
   import: importFramework,
   
   // explicitly convert values between ObjC and JS types
-  js,
-  ns,
+  js: codecs.js,
+  ns: codecs.ns,
   
   // type checking (note: users should use these functions to identify ObjC objects, not `instanceof` which won't check for method Proxy wrapper)
   isObject: instance.isWrappedObjCObject,
@@ -58,15 +73,19 @@ module.exports = new Proxy({
   isInstance: instance.isWrappedObjCInstance,
   
   // creating ObjC-specific types
-  // note: use objc.__internal__.types to access napi-ref-compatible type objects currently used by Block, Selector, etc (moving it there reduces top-level noise in objc namespace, and it is lower-level technical stuff for use in ffi-napi); TO DO: if/when .bridgesupport is implemented, users should almost never need to define Struct types, or C function or Block argument/result types manually (hence `objc.__internal__.types`, not `objc.types`, in anticipation of this); FWIW, once ObjC type encoding parser can read full signatures, we should probably just use that for user-defined Structs, Blocks, NSObject subclasses too: the overhead of parsing those strings into ref-napi types will be minimal and ObjC type strings are probably easier to write than ref-napi code
+  // note: use objc.__internal__.types to access napi-ref-compatible type objects if needed (moving it there reduces top-level noise in objc namespace, and it is lower-level technical stuff for use in ffi-napi); TO DO: if/when .bridgesupport is implemented, users should almost never need to define Struct types, or C function or Block argument/result types manually (hence `objc.__internal__.types`, not `objc.types`, in anticipation of this); FWIW, once ObjC type encoding parser can read full signatures, we should probably just use that for user-defined Structs, Blocks, NSObject subclasses too: the overhead of parsing those strings into ref-napi types will be minimal and ObjC type strings are probably easier to write than ref-napi code
   
-  structs, // use `objc.structs.define(ENCODING)` to define new ObjC struct types, and `new objc.structs.NAME(...)` to create instances of a struct
+  // simple types
   
-  Block, // TO DO: replace this with objc.blocks, using `objc.blocks.define(ENCODING[,NAME])` to define block types and `new objc.blocks.NAME(callback)` to instantiate them
-  
-  Ref: ObjCRef, // use `new objc.Ref([VALUE])` to create pointer values to pass as inout/out arguments to methods
+  Ref: Reference, // use `new objc.Ref([VALUE])` to create pointer values to pass as inout/out arguments to methods
   
   Selector, // use `new Selector(NAME)` to create a new ObjC selector using NS-style method name, e.g. `new Selector("foo:barBaz:")`; this is equivalent to `@selector(NAME)` in ObjC
+  
+  // complex types
+  
+  structs: objcstruct.structs, // use `objc.structs.define(ENCODING[,...NAMES])` to define new ObjC struct types, and `new objc.structs.NAME(...)` to create instances of a struct
+  
+  blocks: objcblock.blocks, // use `objc.blocks.define(ENCODING[,...NAMES])` to define block types and `new objc.blocks.NAME(callback)` to instantiate them
   
   
   
