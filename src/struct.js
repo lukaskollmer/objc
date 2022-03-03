@@ -124,8 +124,8 @@ const structs = new Proxy(_structTypes, {
 	get: (structTypes, key) => {
 		let retval;
 		if (key === 'define') {
-			retval = getStructTypeForEncoding;
-			
+			return getStructTypeForEncoding;
+		}
 		switch (key) {
 		case 'define':
 			return getStructTypeForEncoding;
