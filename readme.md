@@ -114,7 +114,7 @@ If a method expects an `inout` or `out` argument (e.g. `NSError**`), use an `obj
 ```js
 const {NSAppleScript, Ref} = objc;
 
-const script = NSAppleScript.alloc().initWithSource_('foobar');
+const script = NSAppleScript.alloc().initWithSource_('get foobar');
 
 const error = new Ref();
 script.executeAndReturnError_(error); // `executeAndReturnError:` takes a `NSDictionary**`
@@ -138,34 +138,30 @@ The `Ref` constructor optionally takes an "in" value as argument. This can be an
 
 ### Blocks
 
-_TO DO: finalize and test_
+_TO DO: finalize API_
 
-You can create a block with the `objc.Block` helper class:
+Use `objc.blocks.define(encoding[,...names])` to define a block's type, optionally followed by one or more names :
 
 ```js
-const block = new objc.Block(() => {
-  console.log('In the block!');
-}, 'v');
+objc.blocks.define('q@@@', 'NSComparator');
 ```
 
-When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters. (For now, use ref-napi types.)
-
-**Note:** If a block takes an Objective-C object (pointer) as its parameter, you currently need to manually wrap that pointer as an objc object using the `objc.__internal__.wrap(ptr)` helper function.
+When creating a block, you need to explicitly declare the type encoding of the block's return value and all its parameters.
 
 **Example:** Sort an array by word length, longest to shortest
 
 ```js
 const objc = require('objc');
-const internal = objc.__internal__;
-const types = internal.types;
+
+objc.blocks.define('q@@@', 'NSComparator');
+
 
 const array = NSArray.arrayWithArray_(['I', 'Am', 'The', 'Doctor']);
 
-const longestToShortest = new Block((arg1, arg2) => {
-  arg1 = internal.wrap(arg1);
-  arg2 = internal.wrap(arg2);
-  return arg1.length() > arg2.length() ? -1 : 1;
-}, types.NSInteger, [types.id, types.id]);  // Match the NSComparator signature
+const longestToShortest = new objc.blocks.NSComparator(
+								  (thing1, thing2) => {
+									return thing1.length() < thing2.length() ? -1 : +1;
+								  });
 
 const sorted = array.sortedArrayUsingComparator_(longestToShortest);
 // => ['Doctor', 'The', 'Am', 'I']
@@ -177,16 +173,25 @@ const sorted = array.sortedArrayUsingComparator_(longestToShortest);
 You can load ObjC constants (typically `NSString*`) just like you'd access a class:
 
 ```js
-const {NSFontAttributeName} = objc;
-console.log(NSFontAttributeName);   // => 'NSFont'
+const objc = require('objc');
+
+console.log(objc.NSFontAttributeName);   // => 'NSFont'
 ```
 
 ObjC constants are returned as objc objects.
 
 
+### Functions
+
+_TO DO: implement `wrapFunction(name,encoding)`_
+
+e.g. `NSStringFromRect`
+
 ### Structs
 
-Use `objc.structs.define(encoding)` function to define a struct by its name and layout. The resulting `StructType` is available as `objc.structs.NAME`. It is also compatible with the `ffi-napi`, `ref-napi`, `ref-struct-di` modules.
+_TO DO: finalize API_
+
+Use `objc.structs.define(encoding[,...names])` function to define a struct by its name and layout. The resulting `StructType` is available as `objc.structs.NAME`. It is also compatible with the `ffi-napi`, `ref-napi`, `ref-struct-di` modules.
 
 The `objc` module already provides definitions for the following:
 
@@ -195,7 +200,7 @@ The `objc` module already provides definitions for the following:
 * `NSRect`
 * `NSRange`
 
-Use `new StructType(OBJECT)` to create an instance of the struct, passing an object to populate the struct. (Note: missing fields are set to `0`/`null`.)
+Use `new StructType(object)` to create an instance of the struct, passing an object to populate the struct. (Note: missing fields are set to `0`/`null`.)
 
 **Example:** Using structs with objc methods
 
@@ -204,7 +209,7 @@ const objc = require('objc');
 
 const string = objc.ns('Hello World');
 const substring = string.substringWithRange_(new objc.structs.NSRange({location: 0, length: 5}));
-// -> 'Hello'
+// => 'Hello'
 ```
 
 
@@ -212,25 +217,30 @@ const substring = string.substringWithRange_(new objc.structs.NSRange({location:
 
 _TO DO: API is not finalized_
 
-Use the `objc.createClass` function to register custom classes with the Objective-C runtime:
+Use the `objc.defineClass` function to register custom classes with the Objective-C runtime:
 
 ```js
 const objc = require('objc');
-const internal = objc.__internal__;
 
-const LKGreeter = objc.createClass('LKGreeter', 'NSObject', {
-  'greet:': (self, cmd, name) => {
-    name = internal.wrap(name);
-    return objc.ns(`Hello, ${name}!`);
+const LKGreeter = objc.defineClass('LKGreeter', 'NSObject', {
+  
+  greet_: (self, name) => { // define instance method -[LKGreeter greet:]
+    return `Hello, ${name}!`;
   },
 
-  _encodings: {
-    'greet:': ['@', ['@', ':', '@']]
+  __encodings__: { // and define the ObjC type encoding for it
+    greet_: '@@:@',
   }
 });
 
 LKGreeter.new().greet('Lukas'); // => 'Hello, Lukas!'
 ```
+
+To define class methods, prefix the method name with `$`, e.g.:
+
+* `$foo_bar_` - class method `foo:bar:`
+
+* `foo_bar_` - instance method `foo:bar:`
 
 **Note:** You might have to specify individual offsets in the type encoding, see [this example](/examples/delegate.js).
 

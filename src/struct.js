@@ -68,6 +68,15 @@ function addStructType(type) {
 
 function getStructTypeByName(objcName) {
 	// return the named StructType, or null if it is not defined; used by ObjCTypeEncodingParser.readStructType
+	//
+	// TO DO: all caches should use one of these for safety: 
+	//
+	// if (Object.prototype.hasOwnProperty.call(structTypes, key)) { // as in ./index.js
+  //    return structTypes[key];
+  // }
+  //
+  // or cache object could be `Object.create(null)` (an object with no prototype to inherit from) or possibly use `Map` class
+  //
 	return _structTypes[objcName] || null;
 }
 

@@ -20,7 +20,7 @@ const objcblock = require('./block');
 
 const codecs = require('./codecs').initialize(); // caution: import 'instance' before initializing codecs
 
-const createClass = require('./create-class'); // for subclassing ObjC classes in JS (this needs reworking)
+const objcsubclass = require('./subclass'); // for subclassing ObjC classes in JS (this needs reworking)
 
 instance.swizzle = require('./swizzle');
 
@@ -57,6 +57,9 @@ objcstruct.structs.define('{_NSRange="location"Q"length"Q}', 'NSRange');
 /******************************************************************************/
 
 
+// TO DO: start with `Object.create(null)` for objc namespace/cache, and attach builtins (below) and wrapped ObjC classes, types, objects, etc to that; this avoids need for hasOwnProperty checks
+
+
 module.exports = new Proxy({
   // TO DO: there's a risk in principle of builtin names masking importable names; do we really need to worry about that in practice though, given that [Obj]C strongly encourages framework devs to prefix all exported names with an ad-hoc namespace (e.g. "NSBlock", not, "Block")? if name masking is a concern, we could use `$NAME` to disambiguate imported names; stripping the leading '$' when doing the actual lookup
     
@@ -89,13 +92,14 @@ module.exports = new Proxy({
   
   
   
+  defineBlock: objcblock.getBlockClassForEncoding,
+  defineStruct: objcstruct.getStructTypeForEncoding,
+  defineClass: objcsubclass.defineClass,
+  
   
   [util.inspect.custom]: (depth, inspectOptions, inspect) => { // called by console.log(objc)
     return '[object objc]'; // TO DO: opaque/shallow/deep inspection options (bear in mind that inspecting the `objc` object will only show hardcoded members, and maybe already-imported objects if we make it smart enough to list those too)
   },
-    
-  
-  createClass, // TBD
   
   __internal__: instance, // allow access to internal APIs, should users need to work directly with ObjC pointers (e.g. when passing NS objects to/from CF APIs and vice-versa); caution: here be dragons; TO DO: should ./instance.js define [util.inspect.custom] to hide all of this object?
 }, {
@@ -110,7 +114,9 @@ module.exports = new Proxy({
       return builtins[key];
     } else if (constants.isString(key)) {
       
-      retval = instance.getClassByName(key);
+      retval = instance.getClassByName(key) 
+              || objcstruct.getStructTypeByName(key) 
+              || objcblock.getBlockClassByName(key); // KLUDGE: TO DO: this is nasty and won't prevent name masking (e.g. if a block named 'Foo' is masked by a class or struct also named 'Foo'); we really want to have one cache
     
       if (retval === undefined) { // not a class, so see if we can find a constant with that name
         // note: this only works for [e.g.] NSString constants; primitive constants are typically defined in header, not object file, so aren't runtime-accessible (at least, not without bridgesupport XML), e.g.:

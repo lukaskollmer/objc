@@ -521,13 +521,13 @@ const isWrappedObjCObject = object => object && object[constants.__objcObject] !
 const isWrappedObjCClass = object => {
   if (!object) { return false; }
   let ptr = object[constants.__objcClassPtr];
-  return ptr !== undefined && ptr !== null;
+  return ptr !== undefined && ptr !== null; // TO DO: any reason for not just using `!!ptr`?
 }
 
 const isWrappedObjCInstance = object => {
   if (!object) { return false; }
   let ptr = object[constants.__objcInstancePtr];
-  return ptr !== undefined && ptr !== null;
+  return ptr !== undefined && ptr !== null; // TO DO: ditto
 }
 
 

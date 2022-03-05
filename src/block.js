@@ -29,7 +29,7 @@
 //
 // therefore we will adopt the objc.structs style API and (to KISS) not expose the Block constructor's all-in-one API; instead hiding it behind a [sub]class expression that acts as a closure over the type while taking the function as its sole argument
 //
-//type = type instanceof BlockType ? type : getBlockTypeForEncoding(type); // and since Block's constructor is 'private' (i.e. hidden behind subclass's constructor), we delete this line
+//type = type instanceof BlockType ? type : getBlockClassForEncoding(type); // and since Block's constructor is 'private' (i.e. hidden behind subclass's constructor), we delete this line
 
 
 
@@ -85,6 +85,8 @@ const descriptor = new descriptor_t(0, block_t.size);
 
 // base class for Blocks (this wraps a BlockType and a JS function, allowing that function to be used as an ObjC block)
 
+// TO DO: this is only relevant to JS function-based blocks; we also need a wrapper for ObjC blocks (i.e. blocks passed into JS from ObjC) for which we have objc_opaqueblock_t that can pack a Block instance but can't unpack a block pointer
+
 class Block {
   #type;
   #fn;
@@ -92,36 +94,49 @@ class Block {
   #ptr;
   
   constructor(type, fn) { // external code should not call this constructor directly
-    if (typeof fn !== 'function') { 
-      throw new TypeError(`new objc.blocks.TYPE(...) expected a function, got ${typeof fn}: ${fn}`); 
-    }
-    let skipBlockArgument;
-    if (fn.length === type.argumentTypes.length) {
-      skipBlockArgument = false;
-    } else if (fn.length === type.argumentTypes.length - 1) {
-      skipBlockArgument = true;
-    } else {
-      throw new TypeError(`new objc.blocks.TYPE(...) expected a function with ${type.argumentTypes.length} parameters, got ${fn.length}`); 
-    }
-    const callback = ffi.Callback(type.returnType, type.argumentTypes, function(blockPtr, ...args) { // eslint-disable-line new-cap
-      // Call the block implementation, by default skipping the 1st parameter (the block itself)
-      const retval = fn.apply(null, skipBlockArgument ? args : [blockPtr, ...args]); // TO DO: can/should we pass `this` instead of blockPtr?
-      
-      // TO DO: as with ObjC methods, any inout args need additional processing, although this time it works in reverse, updating Ref.__ptr with the new (packed) Ref.value
-      
-      return retval;
-    });
-    this.#fn = fn;
     this.#type = type;
-    this.#callback = callback;
-    this.#ptr = new block_t({
-        isa:        _NSConcreteGlobalBlock,
-        flags:      1 << 29,
-        reserved:   0,
-        invoke:     callback,
-        descriptor: descriptor.ref()
-    }).ref();
+    
+    // TO DO: should this move into its own subclass?
+    if (typeof fn === 'function') {
+      
+      let skipBlockArgument;
+      if (fn.length === type.argumentTypes.length) {
+        skipBlockArgument = false;
+      } else if (fn.length === type.argumentTypes.length - 1) {
+        skipBlockArgument = true;
+      } else {
+        throw new TypeError(`new objc.blocks.TYPE(...) expected a function with ${type.argumentTypes.length} parameters, got ${fn.length}`); 
+      }
+      
+      const callback = ffi.Callback(type.returnType, type.argumentTypes, function(blockPtr, ...args) { // eslint-disable-line new-cap
+        // Call the block implementation, by default skipping the 1st parameter (the block itself)
+        const retval = fn.apply(null, skipBlockArgument ? args : [blockPtr, ...args]); // TO DO: can/should we pass `this` instead of blockPtr?
+      
+        // TO DO: as with ObjC methods, any inout args need additional processing, although this time it works in reverse, updating Ref.__ptr with the new (packed) Ref.value
+      
+        return retval;
+      });
+      this.#fn = fn;
+      this.#callback = callback;
+      this.#ptr = new block_t({
+          isa:        _NSConcreteGlobalBlock,
+          flags:      1 << 29,
+          reserved:   0,
+          invoke:     callback,
+          descriptor: descriptor.ref()
+      }).ref();
+    
+    } else if (fn instanceof Buffer) { // assume it is a pointer to an ObjC block
+      this.#fn = () => { throw new Error(`Opaque Block cannot yet be called directly.`); }
+      this.#callback = null;
+      this.#ptr = fn;
+      
+    } else {
+          throw new TypeError(`new objc.blocks.TYPE(...) expected a function, got ${typeof fn}: ${fn}`); 
+    }
   }
+    
+  get __callback__() { return this.#callback; } // kludge: see subclass.addMethods
     
   get type() { return this.#type; } // TO DO: ensure naming conventions are consistent across objc APIs
   get fn()   { return this.#fn; } // we could make also make Block directly callable, but it is probably best for it to appear to JS code as an explicit wrapper around a JS value (in this case, a function)
@@ -168,40 +183,43 @@ class BlockType { // caution: as with ObjCClass, ObjCStructType, etc, users shou
     }
     ref.writePointer(buffer, offset || 0, ptr); // ...and pack it into the buffer provided
   }
-  
-  newBlock(fn) { // TO DO: *not* a fan of this; `new objc.blocks.BLOCKTYPE(...)` would be canonical and consistent with `objc.structs.TYPE(OBJECT)`; instead, getBlockTypeForEncoding should bind and return a class expression (which is just syntax over JS's prototypal OO)
-    return new Block(this, fn);
-  }
 }
 
 
-const _blockTypes = {}; // cache
+const _blockTypes = {}; // cache; TO DO: we may need to keep separate caches for struct/block/function type encoding strings, as those can be quite generic, e.g. `@@`, and just put the bridgesupport+user-defined names into top-level objc namespace/cache
 
 
-const getBlockTypeForEncoding = (encoding, ...names) => { // similar to getClassByName, this looks up BlockType by encoding string, creating and caching a new BlockType object if it doesn't already exist
+
+function getBlockClassByName(objcName) {
+	// return the named BlockType, or null if it is not defined
+	return _blockTypes[objcName] || null;
+}
+
+
+const getBlockClassForEncoding = (encoding, ...names) => { // similar to getClassByName, this looks up BlockType by encoding string, creating and caching a new BlockType object if it doesn't already exist // TO DO: rename `define...`? (whereas `getClass...` gets an existing ObjC class already defined by runtime, e.g. when its framework was loaded, this defined a new wrapper from scratch)
   if (!constants.isString(encoding)) {
-    throw new Error(`getBlockTypeForEncoding expected an encoding string, got ${typeof encoding}: ${encoding}`);
+    throw new Error(`getBlockClassForEncoding expected an encoding string, got ${typeof encoding}: ${encoding}`);
   }
-  let type = _blockTypes[encoding];
-  if (!type) {
-    const _type = new BlockType(encoding);
-    type = class _ extends Block { // this is class from 1 or more Block instances can be created
+  let blockClass = _blockTypes[encoding]; // look for an existing Block class, if already created
+  if (!blockClass) {
+    const blockType = new BlockType(encoding); // create a ref-napi compatible type description
+    blockClass = class extends Block { // create a subclass from which Block instances of this type can be instantiated
       constructor(fn) {
-        super(_type, fn);
+        super(blockType, fn);
       }
     };
-    Object.defineProperty(type, 'name', {value: names[0] || 'AnonymousBlock', writable: false});
-    _blockTypes[encoding] = type;
+    Object.defineProperty(blockClass, 'name', {value: names[0] || 'AnonymousBlock', writable: false});
+    _blockTypes[encoding] = blockClass; // cache the class under its encoding string
   }
-	for (let name of names) {
-	  if (type !== _blockTypes[name]) {
+	for (let name of names) { // alias it under any human-readable names
+	  if (blockClass !== _blockTypes[name]) {
       if (_blockTypes[name] !== undefined) {
         throw new Error(`Can't add BlockType alias named '${name}' as it already exists.`);
       }
-      _blockTypes[name] = type;
+      _blockTypes[name] = blockClass;
 		}
 	}
-  return type;
+  return blockClass; // return it so caller can start using it immediately
 };
 
 
@@ -213,7 +231,7 @@ const blocks = new Proxy(_blockTypes, {
 		let retval;
 		switch (key) {
 		case 'define':
-			return getBlockTypeForEncoding;
+			return getBlockClassForEncoding;
 		case 'isBlock':
 			return (value) => (value instanceof Block);
 		case 'isBlockType':
@@ -235,7 +253,9 @@ const blocks = new Proxy(_blockTypes, {
 /******************************************************************************/
 // caution: there are circular dependencies between this module and objctypes, so don't use `module.exports = {...}`
 
-module.exports.getBlockTypeForEncoding  = getBlockTypeForEncoding; // for internal use only
+module.exports.getBlockClassByName      = getBlockClassByName;
+
+module.exports.getBlockClassForEncoding  = getBlockClassForEncoding; // for internal use only
 module.exports.Block                    = Block; // for internal use only
 
 module.exports.blocks                   = blocks; // public API for accessing BlockTypes

@@ -139,9 +139,8 @@ const objc_opaqueblock_t = { // TO DO: move this to ./block.js?
   ffi_type: ffi.FFI_TYPES.pointer,
   indirection: 1,
   get: (buffer, offset) => {
-    //const ptr = ref.readPointer(buffer, offset || 0);
-    //return ptr.isNull() ? null : new Block(ptr); // TO DO: this is close: we just need to create the Block using objc_opaqueblock_t as its type
-    throw new Error(`Can't get ObjC Block as its type is unknown.`); // TO DO: see above TODO
+    const ptr = ref.readPointer(buffer, offset || 0);
+    return ptr.isNull() ? null : new objcblock.Block(objc_opaqueblock_t, ptr); // opaque Block; not currently callable from within JS, but at least it can pass through JS back to ObjC
   },
   set: (buffer, offset, value) => {
     if (!(value instanceof objcblock.Block)) {
@@ -472,7 +471,7 @@ class ObjCTypeEncodingParser {
   parseTypes(encoding) {
     // parse a sequence of one or more ObjC type encodings; typically a method, struct, or block’s type
     // encoding : string -- an ObjC type encoding string, e.g. "@:@io^@"
-    // Result: [object,...] -- one or more ref-napi compatible type definitions, suitable for use in ffi-napi
+    // Result: [object,...] -- one or more ref-napi compatible type definitions, suitable for use in ffi-napi // TO DO: should result be [returnType,[argType,...]]? this is what ffi APIs expect and it'd save caller having to shift the return type off the Array
     // e.g. method signatures obtained via ObjC's introspection APIs
     this.encoding = encoding;
     this.cursor = 0;

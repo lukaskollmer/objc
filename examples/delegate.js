@@ -11,15 +11,18 @@ const {
 
 
 // the newly created ObjC class is available as `objc.FileManagerDelegate`
-objc.createClass('FileManagerDelegate', 'NSObject', {
-  'fileManager:shouldMoveItemAtPath:toPath:': (self, cmd, fileManager, srcPath, dstPath) => {
+objc.defineClass('FileManagerDelegate', 'NSObject', {
+  // instance methods
+  
+  fileManager_shouldMoveItemAtPath_toPath_: (self, cmd, fileManager, srcPath, dstPath) => {
     console.log('calling: -[NSFileManagerDelegate fileManager:shouldMoveItemAtPath:toPath:]');
     return 1;
   },
-
-  _encodings: {
-    'fileManager:shouldMoveItemAtPath:toPath:': ['c40', ['@0', ':8', '@16', '@24', '@32']]
+  
+  __encodings__: {
+    fileManager_shouldMoveItemAtPath_toPath_: 'c40@0:8@16@24@32',
   }
+  
 });
 
 
