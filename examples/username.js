@@ -10,4 +10,4 @@ const {
 
 let username = NSProcessInfo.processInfo().userName();
 
-console.log(`Your username is: ${username}`); // Your username is: NAME
+console.log(`Your username is: ${username}`); // "Your username is: ..."

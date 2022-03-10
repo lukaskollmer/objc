@@ -4,9 +4,6 @@
 
 // TO DO: should `undefined` pass-thru as-is or be treated as TypeError (currently the latter)
 
-// TO DO: it might be possible to wrap JS-only values in an opaque NSValue, allowing them to pass through ObjC APIs unchanged (lthough there are probably issues there with JS's GC not knowing the value is non-collectable); determine the JS types not handled above—Symbol, Buffer, Function, etc—and decide which, if any, should be allowed through in boxed form; also, is there a way to distinguish objects created from ES6 classes and provide option for client code to install their own codecs for mapping those
-
-// TO DO: once the behavior of ns() and js() is finalized, performance optimize them as much as possible as converting to and from standard JS types will be a significant bottleneck; e.g. bypass ./instance.js's high-level wrappers and use the ffi APIs directly, (since there's only a half-dozen JS types to bridge, it's worth the extra coding); much of the safety checks that are performed when user calls arbitrary methods with arbitrary arguments can be skipped; as well as bypassing at least some of ./instance.js's class and method wrappers (with their associated overheads, particularly when packing/unpacking arrays and dictionaries), it might even be possible to skip some of the ObjC dynamic dispatch (objc_msgSend itself is very fast, but our wrapper code around it adds its own non-trivial overhead) and assign the classes and methods' underlying C pointers to consts and use those directly with FFI APIs
 
 /*
 TO DO: still slow! e.g.:
@@ -108,8 +105,6 @@ function initialize() {
 const jsReturnIfUnconverted = object => object;
 
 
-// TO DO: it *might* be possible to wrap JS-only values in an opaque NSValue, allowing them to pass through ObjC APIs unchanged, though this is contingent upon JS GC being able to increment+decrement NSValue's refcount, and not collecting while the NSValue is also retained by ObjC runtime
-
 const nsThrowIfUnconverted = object => {
   const typename = typeof object === 'object' ? object.constructor.name : typeof object;
   throw new TypeError(`objc.ns() cannot convert value: ${typename}`);
@@ -117,8 +112,9 @@ const nsThrowIfUnconverted = object => {
 
 
 /******************************************************************************/
-
 // unpack
+
+// TO DO: should be able to streamline this a bit
 
 const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: what about passing optional function for unpacking dictionary items? see also TODO below
   // object : ObjCObject -- JS values are returned as is
@@ -171,6 +167,7 @@ const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: 
 };
 
 
+/******************************************************************************/
 // pack
 
 const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = false) => {

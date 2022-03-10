@@ -5,8 +5,6 @@ const util = require('util');
 const ffi = require('ffi-napi');
 const ref = require('ref-napi');
 
-const constants = require('./constants');
-
 
 const dlfcn = new ffi.Library(null, {
   dlopen: ['pointer', ['string', 'int']]
@@ -47,31 +45,18 @@ libobjc.objc_msgSend = ffi.DynamicLibrary().get('objc_msgSend'); // eslint-disab
 
 
 // TO DO: this is probably redundant from users' POV as they can just ask for objc.CLASSNAME and catch 'not found' error
-const classExists = classname => !libobjc.objc_getClass(classname).isNull();
+const classExists = (classname) => !libobjc.objc_getClass(classname).isNull();
 
-// TO DO: better function names?
-
-const getSymbol = name => new ffi.DynamicLibrary().get(name);
-
-const getSymbolAsId = name => { // get a symbol which caller knows to be an ObjC object (`id`, usually NSString* const)
-  try {
-    const symbol = getSymbol(name);
-    symbol.type = ref.refType(ref.refType(ref.types.void));
-    return symbol.deref();
-  } catch (err) {
-    return null;
-  }
-};
-
+const getSymbol = (name) => new ffi.DynamicLibrary().get(name); // TO DO: why does this create new DynamicLibrary object every time it's called?
 
 
 dlfcn.dlopen('/System/Library/Frameworks/Foundation.framework/Foundation', ffi.DynamicLibrary.FLAGS.RTLD_LAZY);
 
 
 module.exports = libobjc;
-module.exports.classExists = classExists;
-module.exports.getSymbol = getSymbol;
-module.exports.getSymbolAsId = getSymbolAsId;
+
+module.exports.classExists          = classExists;
+module.exports.getSymbol            = getSymbol;
 
 module.exports[util.inspect.custom] = () => '[object objc.__internal__.runtime]'; // TO DO: crude, but any user sufficiently advanced to perform this magic this had best read the module source and corresponding ObjC documentation
 

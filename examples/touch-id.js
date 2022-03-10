@@ -24,10 +24,12 @@ console.log(context.canEvaluatePolicy_error_(LAPolicyDeviceOwnerAuthenticationWi
 let sema = c.dispatch_semaphore_create(0);
 
 
-const handler = new objc.Block((success, err) => {
+const HandlerType = objc.defineBlock('v@c@');
+
+const handler = new HandlerType((success, err) => {
   console.log('handler');
   c.dispatch_semaphore_signal(sema);
-}, 'v', ['c', '@']);
+});
 
 console.log(objc.NSThread.currentThread());
 context.evaluatePolicy_localizedReason_reply_(LAPolicyDeviceOwnerAuthenticationWithBiometrics, 'HEY', handler);

@@ -27,7 +27,7 @@ const ref = require('ref-napi');
 
 const constants = require('./constants');
 
-const Reference = require('./reference');
+const Ref = require('./reference');
 const Selector = require('./selector');
 const objcblock = require('./block');
 const objcstruct = require('./struct');
@@ -183,15 +183,15 @@ class ObjCRefType {
   
   get(buffer, offset) { // TO DO: what should we do with offset?
     const value = this.reftype.get(buffer.deref(), offset, this.reftype); // TO DO: fragile `this` assumes that ref-ffi and other APIs which use ref.types will never separate get/set functions (methods in this case) from their containing object (if there is a possibility they could/do then switch back to traditional protypal `function(...){...}` syntax, as that can use explicit name binding instead of `this` to reliably close over object state within method functions)
-    return new Reference(value);
+    return new Ref(value);
   }
   
   set(buffer, offset, value) { // TO DO: what should we do with offset?
     let ptr;
-    if (value instanceof Reference) {
+    if (value instanceof Ref) {
       ptr = ref.alloc(pointerType);
       this.reftype.set(ptr, offset, value.value, this.reftype);
-      // attach [copy of] ptr to Reference, so that method wrapper can check if it has changed and rewrap if it has
+      // attach [copy of] ptr to Ref, so that method wrapper can check if it has changed and rewrap if it has
       value.__outptr = ptr;
       value.__inptr = Buffer.from(ptr);
       value.__reftype = this.reftype;
@@ -200,7 +200,7 @@ class ObjCRefType {
     } else if (value instanceof Buffer) { // assume user knows what they're doing // TO DO: we should probably check this for ffi_type (Q. does ref.alloc attach type to buffer?) and confirm indirection level is correct
       ptr = value;
     } else {
-      throw new TypeError(`Expected an Reference or null but received ${typeof value}: ${value}`);
+      throw new TypeError(`Expected a Ref or null but received ${typeof value}: ${value}`);
     }
     ref.writePointer(buffer, offset || 0, ptr);
   }
@@ -374,10 +374,10 @@ class ObjCTypeEncodingParser {
       const existingType = objcstruct.getStructTypeByName(name);
       
       
-      if (!existingType || existingType.objcEncoding.length < structEncoding) { // kludge; we want the most detailed definition to be kept; TO DO: e.g. 'substringWithRange:' has encoding '@32@0:8{_NSRange=QQ}16', which is not full _NSRange encoding
+      if (!existingType || existingType.objcEncoding.length < structEncoding) { // kludge; we want the most detailed definition to be kept; TO DO: e.g. 'substringWithRange:' has encoding '@32@0:8{_NSRange=QQ}16', which is not full _NSRange encoding as it lacks property names
       
         type.objcEncoding = structEncoding;
-        objcstruct.addStructType(type); // add this new StructType to objcstruct's cache
+        objcstruct.addStructType(type); // add this new StructType to objcstruct's cache // TO DO: might be safer to merge this type object into the cached object instead of replacing it
       
       } else { // there's already a full encoding
         objcstruct.aliasStructType(existingType, structEncoding);
@@ -468,7 +468,7 @@ class ObjCTypeEncodingParser {
     return type;
   }
 
-  parseTypes(encoding) {
+  parseTypeArray(encoding) {
     // parse a sequence of one or more ObjC type encodings; typically a method, struct, or block’s type
     // encoding : string -- an ObjC type encoding string, e.g. "@:@io^@"
     // Result: [object,...] -- one or more ref-napi compatible type definitions, suitable for use in ffi-napi // TO DO: should result be [returnType,[argType,...]]? this is what ffi APIs expect and it'd save caller having to shift the return type off the Array
@@ -484,13 +484,13 @@ class ObjCTypeEncodingParser {
 }
 
 
-const typeParser = new ObjCTypeEncodingParser();
+const typeParser = new ObjCTypeEncodingParser(); // TO DO: shared parser object is not thread-safe; either create a new instance per-use or pass encoding+cursor as arguments to read methods
 
 
 /******************************************************************************/
 
 
-const coerceObjCType = (encoding) => typeParser.parseTypes(encoding);
+const coerceObjCType = (encoding) => typeParser.parseTypeArray(encoding);
 
 
 const introspectMethod = (object, methodName) => {
@@ -531,12 +531,9 @@ const introspectMethod = (object, methodName) => {
     throw new TypeError(`No method named objc.${object.name}.${methodName}${msg}`);
   }
   const encoding = runtime.method_getTypeEncoding(method);
-  const argTypes = typeParser.parseTypes(encoding); // [result, target, selector,...arguments]
+  const argTypes = typeParser.parseTypeArray(encoding); // [result, target, selector,...arguments]
   const returnType = argTypes.shift();
-  
-//  console.log('>>>>', selectorName, encoding, argTypes[2])
-  
-  // TO DO: stripped down encoders for first 2 arguments, and always pass ptrs for those to msgSend
+  // first 2 args are always target and selector, which method wrapper already passes as pointers
   argTypes[0] = pointerType;
   argTypes[1] = pointerType;
   let inoutIndexes = [];
@@ -544,12 +541,11 @@ const introspectMethod = (object, methodName) => {
     if (arg instanceof ObjCRefType) { inoutIndexes.push(i); }
   }
   return { // used in callObjCMethod
-    //argTypes, returnType, // DEBUG
     methodName, // used in error messages
-    sel, // arg 1 to msgSend
+    sel, // ptr -- arg 1 to msgSend
     encoding, // string // currently used in error messages, although it's not particularly user-friendly
-    argc: argTypes.length, // method wrapper does its own argument count check // TO DO: needed?
-    inoutIndexes: (inoutIndexes.length > 0 ? inoutIndexes : null), // used to set out values in objc.Ref arguments
+    argc: argTypes.length, // method wrapper does its own argument count check
+    inoutIndexes: (inoutIndexes.length > 0 ? inoutIndexes : null), // used to set values in objc.Ref `[in]out` arguments
     msgSend: ffi.ForeignFunction(runtime.objc_msgSend, returnType, argTypes), // eslint-disable-line new-cap
   };
 }

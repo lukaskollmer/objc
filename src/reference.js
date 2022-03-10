@@ -1,4 +1,4 @@
-// Reference -- use with ObjC class and instance methods that return-by-argument
+// Ref -- use with ObjC class and instance methods that return-by-argument
 
 // notes:
 //
@@ -12,7 +12,7 @@
 // inout argument
 
 
-class Reference {
+class Ref {
 	#value;
 	__inptr; __outptr; __reftype; // used internally by objctypes to update out arguments
 	
@@ -20,7 +20,7 @@ class Reference {
 		this.#value = value;
 	}
 	
-	deref() { // call this after the ObjC method returns to get the returned value // TO DO: get rid of this
+	deref() { // call this after the ObjC method returns to get the returned value // TO DO: get rid of this? (ref.value is preferred)
 		return this.#value;
 	}
 	
@@ -36,5 +36,5 @@ class Reference {
 
 
 
-module.exports = Reference;
+module.exports = Ref;
 

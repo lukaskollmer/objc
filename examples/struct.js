@@ -7,18 +7,18 @@ const objc = require('../src/index');
 const NSObjectType = objc.__internal__.types.objc_instance_t;
 
 
-// note: NSStringFromRect and NSRectFromString are C functions, so for now must be manually bridged // TO DO: add `objc.functions` object to simplify this
+// note: NSStringFromRect and NSRectFromString are C functions, so for now must be manually bridged // TO DO: add `objc.defineFunction` to simplify this
 const foundation = new ffi.Library(null, {
-  NSStringFromRect: [NSObjectType, [objc.structs.NSRect]],
-  NSRectFromString: [objc.structs.NSRect, [NSObjectType]],
+  NSStringFromRect: [NSObjectType, [objc.NSRect]],
+  NSRectFromString: [objc.NSRect, [NSObjectType]],
 });
 
 
 // create a new NSRect value:
 
-const rect = new objc.structs.NSRect({
-  origin: new objc.structs.NSPoint({x: 5, y: 10}),
-  size: new objc.structs.NSSize({width: 100, height: 250}),
+const rect = new objc.NSRect({
+  origin: new objc.NSPoint({x: 5, y: 10}),
+  size: new objc.NSSize({width: 100, height: 250}),
 });
 
 

@@ -20,12 +20,8 @@
 //
 
 
-// TO DO: there is a strong argument for attaching manually defined structs, blocks, and functions to the top-level `objc` object (which already contains ObjC classes and constants), as in ObjC their names all occupy the same global C namespace, and placing them in separate `objc.blocks`, `objc.structs`, etc namespaces, while neat and logical, 1. provides a false sense of security and 2. fails to check for or protect against any namespace collisions, which could cause a lot of pain later; for now, we'll commit the code as-is, but it will almost certainly have to change shortly
 
-
-// as with Block and create-class, it may be possible to consolidate the APIs for constructing signatures; bear in mind that .bridgesupport support (if implemented) would also use this (for now, non-introspectable [non-ObjC] APIs must be manually bridged, including all CoreFoundation-based APIs [most of CF's own functionality is already natively accessible in Foundation, but some parts aren't and some modern OS APIs are C-based so use CF types rather than Foundation equivalents])
-
-// TO DO: should methods accept an object where a struct is expected, and perform the object-to-struct conversion automatically? (we'd need to define our own ObjCStructType codec for this, which boxes/replaces the original ref-struct-di version); it would be convenient for users (also slower, but convenience may outweigh that)
+// TO DO: should methods accept an object where a struct is expected, e.g. passing `{location:1, length:2}` for an NSRange argument, and perform the object-to-struct conversion automatically? (we'd need to define our own ObjCStructType codec for this, which boxes/replaces the original ref-struct-di version); it would be convenient for users (also slower, but convenience may outweigh that)
 
 // TO DO: do Struct objects created by StructType provide a way (e.g. valueOf) to convert from struct to JS object? (they do allow access to individual properties by name, so shallow copying object properties might [or might not] work if there isn't a built-in method for getting object directly)
 
@@ -40,7 +36,7 @@ const ref = Object.assign({}, require('ref-napi')); // ...however, the ref-struc
 
 ref.types = objctypes; // ...and amend the copy...
 
-const ObjCStructType = require('ref-struct-di')(ref); // ...and now we can create new ObjC struct types // TO DO: is there any point to parameterizing ref-struct-di with objctypes? (I suspect it's only needed to support populating field types from strings, which requires coerceType) if so, we'll need to dynamically add copies of struct and block types to objctypes so those are available; however, we're trying to insulate user from ref.types (not least because if we want to migrate off ffi-napi to our own [Obj]C extension we'll likely need to replace ref-napi too, or at least provide a fast alternative as first choice with ref-napi as slow fallback)
+const ObjCStructType = require('ref-struct-di')(ref); // ...and now we can create new ObjC struct types // TO DO: is there any point to parameterizing ref-struct-di with objctypes? (I suspect it's only needed to support populating field types from strings, which requires coerceType) if so, we'll need to dynamically add copies of struct and block types to objctypes so those are available; however, we're trying to insulate user from ref.types (not least because if we want to migrate off ffi-napi to our own [Obj]C extension we'll likely need to replace ref-napi too, or at least provide a fast alternative as first choice with ref-napi as slow fallback); honestly, parameterizing ref-struct-di with a complete ref module, instead of the function[s] it actually uses, is so over-broad that it's just bad design - I suspect we'll end up implementing our own StructType (as we've done for BlockType) as it doesn't have good inspection strings and I suspect it may be hard to distinguish a struct's type from an instance of that type
 
 
 // TO DO: another reason to define our own ObjCStructType: it can work with or without field names, e.g. '{_NSRange=QQ}' is a valid type encoding from an ObjC method, but it doesn't include field names, only field types, so a standard StructType created from it won't correctly pack e.g. `{location:1,length:2}` (and worse, silently packs it as {0,0} instead of indicating there's a problem, because JS is slop)
@@ -49,7 +45,7 @@ const ObjCStructType = require('ref-struct-di')(ref); // ...and now we can creat
 /******************************************************************************/
 // StructType cache
 
-const _structTypes = {};
+const _structTypes = Object.create(null);
 
 // for internal use
 
@@ -66,24 +62,10 @@ function addStructType(type) {
 	_structTypes[type.objcEncoding] = type;
 }
 
-function getStructTypeByName(objcName) {
-	// return the named StructType, or null if it is not defined; used by ObjCTypeEncodingParser.readStructType
-	//
-	// TO DO: all caches should use one of these for safety: 
-	//
-	// if (Object.prototype.hasOwnProperty.call(structTypes, key)) { // as in ./index.js
-  //    return structTypes[key];
-  // }
-  //
-  // or cache object could be `Object.create(null)` (an object with no prototype to inherit from) or possibly use `Map` class
-  //
-	return _structTypes[objcName] || null;
-}
 
-
-function aliasStructType(type, aliasName) { // e.g. `aliasStructType('CGRect', 'NSRect')`; used by ObjCTypeEncodingParser.readStructType
+function aliasStructType(type, aliasName) { // e.g. `aliasStructType(CGRect, 'NSRect')`; used by ObjCTypeEncodingParser.readStructType
 	// store an existing StructType under an alias name; equivalent to C's `typedef NAME ALIAS`
-	// type : ObjCStructType | string
+	// type : ObjCStructType
 	// aliasName : string
 	if (_structTypes[aliasName] !== undefined) {
 		throw new Error(`Can't add ObjCStructType alias named '${aliasName}' as it already exists.`);
@@ -91,7 +73,7 @@ function aliasStructType(type, aliasName) { // e.g. `aliasStructType('CGRect', '
 	if (!type) {
 		throw new Error(`BUG in aliasStructType: missing type argument`);
 	}
-	const structType = constants.isString(type) ? getStructTypeByName(type) : type;
+	const structType = constants.isString(type) ? _structTypes[type] : type;
 	if (!structType) {
 		throw new Error(`Can't alias an ObjCStructType named '${type}' as it isn't defined.'`);
 	}
@@ -100,14 +82,14 @@ function aliasStructType(type, aliasName) { // e.g. `aliasStructType('CGRect', '
 
 
 /******************************************************************************/
-// for external use; exported as `objc.structs.define`; this is a 'getter' function in much the same way that `getClassByName` is: if the requested object doesn't already exist, it is created and cached before being returned
+// for external use; exported as `objc.defineStruct`; unlike getClassByName, which fetches an existing ObjC Class that was defined when its ObjC framework was imported, this is equivalent to a C declaration: `typedef struct {...} NAME;`
 
-function getStructTypeForEncoding(encoding, ...names) {
+function defineStructType(encoding, ...names) {
 	// returns a new StructType object with name and properties described by the encoding string, creating and caching it as needed
 	// encoding : string -- an ObjC type encoding string for an ObjC struct type
 	// ...names : string -- zero or more [alias] names
 	// Result: ObjCStructType -- a StructType object for creating new instances of the specified struct
-	// if the StructType does not already exist, it is created and also stored on `objc.structs` under both its name and its encoding for reuse
+	// if the StructType does not already exist, it is created and also stored on `objc` under both its name and its encoding for reuse
 	let type = _structTypes[encoding];
 	if (!type) {
 		type = objctypes.typeParser.parseType(encoding);
@@ -126,35 +108,10 @@ function getStructTypeForEncoding(encoding, ...names) {
 	return type;
 }
 
-// `objc.structs` proxy // TO DO: custom inspect? (ideally we just want to list type names and corresponding encodings)
 
-const structs = new Proxy(_structTypes, {
-	
-	get: (structTypes, key) => {
-		let retval;
-		if (key === 'define') {
-			return getStructTypeForEncoding;
-		}
-		switch (key) {
-		case 'define':
-			return getStructTypeForEncoding;
-		case 'isStruct':
-			return (value) => (value instanceof ObjCStructType);
-		case 'isStructType':
-			return (value) => (value instanceof ObjCStructType);
-		}
-		if (Object.prototype.hasOwnProperty.call(structTypes, key)) { // as in ./index.js
-			return structTypes[key];
-		} else {
-			throw new Error(`Not found: 'objc.structs.[${String(key)}]'`);
-		}
-		return retval;
-	},
-	
-	set: (_, key, value) => { // get rid of this
-	    throw new Error(`Can't set 'objc.${key}'`); // TO SO: as above, this is more robust than JS's default behavior
-	},
-});
+function isStructType(value) {
+  return value instanceof ObjCStructType;
+}
 
 
 /******************************************************************************/
@@ -162,9 +119,13 @@ const structs = new Proxy(_structTypes, {
 
 // used by ObjCTypeEncodingParser.readStructType, to add StructTypes to cache as they are parsed
 module.exports.addStructType        = addStructType;
-module.exports.getStructTypeByName  = getStructTypeByName;
 module.exports.aliasStructType      = aliasStructType;
-module.exports.ObjCStructType       = ObjCStructType; // StructType (with access to ObjC types); used by objctypes
+module.exports.getStructTypeByName  = (name) => _structTypes[name]; // used by `objc` Proxy
+module.exports.ObjCStructType       = ObjCStructType; // StructType (this has extended access to ObjC types, although I suspect this is only needed when specifying property types as strings); used by objctypes
 
-module.exports.structs              = structs; // public API, re-exported as objc.structs
+// public API; these are re-exported on `objc`
+module.exports.defineStructType     = defineStructType;
+module.exports.isStructType         = isStructType;
+module.exports.isStruct             = isStructType; // TO DO: check if ref-struct-di's StructType is also prototype for struct objects
+
 
