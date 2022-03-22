@@ -105,7 +105,7 @@ function initialize() {
 const jsReturnIfUnconverted = object => object;
 
 
-const nsThrowIfUnconverted = object => {
+const nsThrowIfUnconverted = (object) => {
   const typename = typeof object === 'object' ? object.constructor.name : typeof object;
   throw new TypeError(`objc.ns() cannot convert value: ${typename}`);
 }

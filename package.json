@@ -1,6 +1,6 @@
 {
   "name": "objc",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "NodeJS ↔ Objective-C bridge",
   "license": "MIT",
   "repository": "lukaskollmer/objc",
@@ -20,6 +20,10 @@
     "bridge",
     "runtime"
   ],
+  "engines": {
+  	"npm": ">=6.14.4",
+  	"node": ">=14.0.0"
+  },
   "dependencies": {
     "ffi-napi": "^4.0.3",
     "ref-napi": "^3.0.3",

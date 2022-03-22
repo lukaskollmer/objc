@@ -67,17 +67,16 @@ function aliasStructType(type, aliasName) { // e.g. `aliasStructType(CGRect, 'NS
 	// store an existing StructType under an alias name; equivalent to C's `typedef NAME ALIAS`
 	// type : ObjCStructType
 	// aliasName : string
-	if (_structTypes[aliasName] !== undefined) {
-		throw new Error(`Can't add ObjCStructType alias named '${aliasName}' as it already exists.`);
+	if (_structTypes[aliasName] === undefined) { // skip if already defined (i.e. throwing 'already defined' errors here causes more problems than it solves) // TO DO: check new definition is same (or superset) of existing definition? (TBH, we probably need to replace ref-struct-di as its API is not a great fit for our needs; as part of that, being able to upgrade an existing struct type's definition in-place as more details become available; we can also revert to objc's original `TYPE(prop1,prop2,...)` positional API and require all fields to be given, which ref-struct-di's `StructType(OBJECT)` does not)
+    if (!type) {
+      throw new Error(`BUG in aliasStructType: missing type argument`);
+    }
+    const structType = constants.isString(type) ? _structTypes[type] : type;
+    if (!structType) {
+      throw new Error(`Can't alias an ObjCStructType named '${type}' as it isn't defined.'`);
+    }
+    _structTypes[aliasName] = structType; // TO DO: confirm that storing type named 'Foo' under 'Bar' doesn't cause any problems due to mismatched names
 	}
-	if (!type) {
-		throw new Error(`BUG in aliasStructType: missing type argument`);
-	}
-	const structType = constants.isString(type) ? _structTypes[type] : type;
-	if (!structType) {
-		throw new Error(`Can't alias an ObjCStructType named '${type}' as it isn't defined.'`);
-	}
-	_structTypes[aliasName] = structType; // TO DO: confirm that storing type named 'Foo' under 'Bar' doesn't cause any problems due to mismatched names
 }
 
 

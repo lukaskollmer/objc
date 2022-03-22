@@ -9,7 +9,7 @@
 
 // TO DO: wrap NSArray (and NSDictionary?) instances in custom Proxy objects that implement standard JS Array/Object APIs in addition to ObjC instance methods? this would allow a degree of polymorphism, reducing need to explicitly unpack (with added caveat that proxies around mutable NS objects probably can't cache unpacked items as the NS object's contents may change at any time)
 
-// TO DO: FIX: NSAppleEventDescriptor in `<${desc}>` expands to '<true>', which is wrong! (there seems to be a general problem with ObjCObjects [mis]representing themselves as 1/true)
+// TO DO: better error messages in callObjCMethod when arguments fail to pack
 
 
 const util = require('util');
@@ -197,7 +197,7 @@ class ObjCObject {
     // name : string -- the method’s JS name, e.g. 'foo_bar_'
     // args : any -- any arguments to pass to the method
     // Result: ObjCClass | ObjCInstance | null -- a method Proxy-wrapped ObjC object, or null (nil) (note: ObjC objects are not automatically converted back to JS types)
-    return (this.cachedMethods[name] || this.bindMethod(name))(...args);
+    return (this.cachedMethods[name] ?? this.bindMethod(name))(...args);
   }
 }
 
@@ -387,7 +387,7 @@ const createMethodProxy = obj => {
             if (hint === 'number' || (hint === 'default' && (constants.isBoolean(obj) || constants.isNumber(obj)))) {
               return Number(obj); // returns NaN for objects that can't be converted to numbers; this is expected behavior (thus, any ObjCObjects that get to here, will return NaN)
             // ...now deal with string representations; first, ObjCInstance...
-            } else if (obj !== undefined && obj !== null && obj[constants.__objcInstancePtr]) { // null or undefined = not a wrapped ObjCInstance
+            } else if (obj?.[constants.__objcInstancePtr]) {
               // we need to handle ObjCInstances here, so we can call their -[NSObject description] to get a nice descriptive Cocoa-style string, which is typically of the format '<NSSomeClass address-or-other-identifying-info>', e.g. "[<NSWorkspace: 0x600000b186c0>]"; we then wrap this string in square brackets as is the JS tradition, and hope that users don't mistake the result for a single-item Array (we might want to work on ObjC instance representations some more later on)
               return `[${proxyObject.description().UTF8String()}]`; // 
             // ...and finally, ObjCClasses (which can stringify themselves) and JS values are left for JS to stringify
@@ -435,19 +435,10 @@ const createMethodProxy = obj => {
 }
 
 
-const isWrappedObjCObject = (object) => object && object[constants.__objcObject] !== undefined;
+const isWrappedObjCObject   = (object) => object?.[constants.__objcObject] !== undefined;
+const isWrappedObjCClass    = (object) => object?.[constants.__objcClassPtr] !== undefined;
+const isWrappedObjCInstance = (object) => object?.[constants.__objcInstancePtr] !== undefined;
 
-const isWrappedObjCClass = (object) => {
-  if (!object) { return false; }
-  let ptr = object[constants.__objcClassPtr];
-  return Boolean(ptr);
-}
-
-const isWrappedObjCInstance = (object) => {
-  if (!object) { return false; }
-  let ptr = object[constants.__objcInstancePtr];
-  return Boolean(ptr);
-}
 
 
 const getObjCSymbolByName = (name) => { // get a symbol which caller knows to be an ObjC object (`id`, typically a NSString* constant); caution: passing a name for something that is not an ObjC instance will crash

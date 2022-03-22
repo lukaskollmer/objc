@@ -20,6 +20,9 @@
 
 // TO DO: ref-bitfield doesn't seem to have napi version
 
+// TO DO: check behavior is correct (this is type as defined in AE.bridgesupport):
+// objc.defineStruct('{OpaqueAEDataStorageType=}');
+
 const util = require('util');
 
 const ffi = require('ffi-napi');
@@ -92,6 +95,9 @@ const objc_instance_t = {
       console.log('WARN: objc_instance_t.set received an unwrapped ObjCObject');
       ptr = value.ptr;
     } else if (value instanceof Buffer) {
+    
+    throw new Error(`raw buffer`);
+    
       console.log('WARN: objc_instance_t.set received a raw Buffer');
       ptr = value;
     } else {
@@ -152,7 +158,7 @@ const objc_opaqueblock_t = { // TO DO: move this to ./block.js?
 
 
 class ObjCRefType {
-  // a ref-napi compatible type definition for an ObjC pointer
+  // a ref-napi compatible type definition for an objc.Ref pointer object
   //
   // Note: whereas ref-napi constructs a pointer value using:
   // 
@@ -166,6 +172,9 @@ class ObjCRefType {
   //
   // (While a ref-napi pointer value can also be created and passed to an ObjC method, it is up to the user to ensure it is of the correct type; the objc bridge cannot check it and the ObjC runtime will crash if it is not.)
   
+  
+  // TO DO: get/set methods' fragile (dynamic) `this` bindings below assumes that ffi/ref will never bind a type object's get/set functions to variables to be called later, but will always call them directly on body of type object, i.e. `TYPE.get(...)`, never `const f = TYPE.get; f(...)`; however, most ref-napi types are plain old objects containing unbound functions, which does allow such usage; therefore, it'd be safest to avoid using `this` in these methods
+  
   constructor(type) {
     // type : object -- a ref-napi compatible type definition, most often `objc_instance_t` (e.g. when constructing `NSError**` out arguments) though can be any ref-napi compatible type object
     this.reftype = type; // TO DO: make this private and add `get reftype()` for safety? or just apply Object.freeze()? (Q. does ref-napi bother to freeze its own type objects, or are they left mutable and user is entrusted not to bork them?)
@@ -175,18 +184,22 @@ class ObjCRefType {
     this.indirection = 1;
   }
   
-  get name() { return `${this.reftype.name || 'void'}*`; } // TO DO: is this appropriate syntax? (it is not the syntax used by ObjC encoding strings, but ref.types.TYPE.name); TO DO: should we standardize on `objcName` for our own preferred names (e.g. 'CGPoint')
+  get name() { return `${this.reftype.objcName || this.reftype.name || 'void'}*`; } // TO DO: is this appropriate syntax? (it is not the syntax used by ObjC encoding strings, but ref.types.TYPE.name); TO DO: should we standardize on `objcName` for our own preferred names (e.g. 'CGPoint')
   
   [util.inspect.custom]() {
-    return `[ObjCRefType name: '${this.name}']`;
+    return `[objc Ref(${this.reftype.objcName || this.reftype.name || 'void'})]`;
   }
   
-  get(buffer, offset) { // TO DO: what should we do with offset?
-    const value = this.reftype.get(buffer.deref(), offset, this.reftype); // TO DO: fragile `this` assumes that ref-ffi and other APIs which use ref.types will never separate get/set functions (methods in this case) from their containing object (if there is a possibility they could/do then switch back to traditional protypal `function(...){...}` syntax, as that can use explicit name binding instead of `this` to reliably close over object state within method functions)
+  get(buffer, offset) { // e.g. -[NSAppleEventDescriptor aeDesc] returns `^{AEDesc}`, i.e. a pointer to an AEDesc struct
+    //console.log('RefType.get: ', buffer)
+    const data = buffer.readPointer(offset, this.reftype.size); // the thing being pointed at, e.g. AEDesc struct
+    const value = this.reftype.get(data, 0, this.reftype);
+    // Ref is used purely as a wrapper; the value in it has already been unpacked (TO DO: should ref unpack lazily? when does ref-napi's pointer unpack, when returned as function's result?)
     return new Ref(value);
   }
   
   set(buffer, offset, value) { // TO DO: what should we do with offset?
+  //console.log('PACK REF',value)
     let ptr;
     if (value instanceof Ref) {
       ptr = ref.alloc(pointerType);
@@ -362,7 +375,7 @@ class ObjCTypeEncodingParser {
         }
           //console.log(`${name}: read quoted name: '${propertyName}'`)
         const propertyType = this.readType();
-        type.defineProperty(propertyName || `\$${count}`, propertyType); // if no name given, use `$0`, `$1`, etc; TO DO: problem with this is it doesn't match correct fields in object 
+        type.defineProperty(propertyName ?? `\$${count}`, propertyType); // if no name given, use `$0`, `$1`, etc; TO DO: problem with this is it doesn't match correct fields in object 
         count++;
       }
       if (this.currentToken !== '}') { 

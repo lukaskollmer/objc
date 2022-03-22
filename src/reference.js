@@ -20,7 +20,12 @@ class Ref {
 		this.#value = value;
 	}
 	
-	deref() { // call this after the ObjC method returns to get the returned value // TO DO: get rid of this? (ref.value is preferred)
+	ref() {
+		throw new Error('TO DO: Ref.ref');
+	}
+	// TO DO: compatibility with ref-napi 'pointer' codec
+	
+	deref() { // call this after the ObjC method returns to get the returned value
 		return this.#value;
 	}
 	

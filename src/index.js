@@ -109,8 +109,8 @@ module.exports = new Proxy(_builtins, {
       if (constants.isString(key)) {
       
         retval = instance.getClassByName(key) 
-                || struct.getStructTypeByName(key) 
-                || block.getBlockClassByName(key); // KLUDGE: TO DO: this won't prevent name masking (e.g. if a block named 'Foo' is masked by a class or struct also named 'Foo'); we really want to have one cache
+                ?? struct.getStructTypeByName(key) 
+                ?? block.getBlockClassByName(key); // KLUDGE: TO DO: this won't prevent name masking (e.g. if a block named 'Foo' is masked by a class or struct also named 'Foo'); we really want to have one cache
     
         if (retval === undefined) { // not a class or struct/block type, so see if we can find a constant with that name
           // note: this only works for [e.g.] NSString constants; primitive constants are typically defined in header, not object file, so aren't runtime-accessible (at least, not without bridgesupport XML), e.g.:
