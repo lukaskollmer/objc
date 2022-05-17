@@ -28,7 +28,7 @@ Error: BUG: ObjCClass[Symbol.toPrimitive] thinks 'this' is a method Proxy, not i
 //objc.NSString.blahBlah
 //console.log()
 
-console.log(`class representation: '${objc.NSString}'`) // "[ObjCClass: NSString]" -- this is currently returned by ObjCClass.tojs()
+console.log(`class representation: '${objc.NSString}'`) // "[ObjCClass: NSString]" -- this is currently returned by ObjCClass._toPrimitive_()
 
 /*
 //console.log(Boolean) // [Function: Boolean]

@@ -74,6 +74,10 @@ objc.NSMutableArray
 
 The framework for that class must be imported first or an `Error` will be thrown.
 
+#### `objc.auto(fn, ...args)`
+
+Create an autorelease pool before calling a function, `fn`, automatically draining the pool after the function returns or errors. Any additional arguments are passed to the function.
+
 ### Calling methods
 
 _TO DO: array, union, bitwise types_

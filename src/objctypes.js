@@ -10,18 +10,10 @@
 // - create ffi.ForeignFunction wrappers for calling ObjC methods
 //
 
-// TO DO: Struct support
-//
-//  NSPoint '{CGPoint="x"d"y"d}'
-//  NSRectPointer '{CGRect="origin"{CGPoint}"size"{CGSize}}'
-//
-
 // TO DO: ref-array-napi, ref-union-napi
 
 // TO DO: ref-bitfield doesn't seem to have napi version
 
-// TO DO: check behavior is correct (this is type as defined in AE.bridgesupport):
-// objc.defineStruct('{OpaqueAEDataStorageType=}');
 
 const util = require('util');
 
@@ -86,19 +78,15 @@ const objc_instance_t = {
   },
   set: (buffer, offset, value) => {
     let ptr;
-    // TO DO: what value types should this accept?
     if (instance.isWrappedObjCObject(value)) {
       ptr = value[instance.keyObjCObject].ptr;
     } else if (value === null) {
       ptr = ref.NULL;
-    } else if (value instanceof instance.ObjCObject) {
-      console.log('WARN: objc_instance_t.set received an unwrapped ObjCObject');
+    } else if (value instanceof instance.ObjCObject) { // this probably should never happen
+      console.log('WARN: objc_instance_t.set received an unwrapped ObjCObject'); // DEBUG
       ptr = value.ptr;
-    } else if (value instanceof Buffer) {
-    
-    throw new Error(`raw buffer`);
-    
-      console.log('WARN: objc_instance_t.set received a raw Buffer');
+    } else if (value instanceof Buffer) { // for users who like to live dangerously; it's up to user to pass a valid Buffer containing a non-NULL pointer to an ObjC instance (passing a Buffer to anything else is liable to cause data corruption/crashes)
+      console.log('WARN: objc_instance_t.set received a raw Buffer'); // DEBUG
       ptr = value;
     } else {
       ptr = codecs.ns(value, (value) => {
@@ -122,13 +110,12 @@ const objc_selector_t = {
   },
   set: (buffer, offset, value) => {
     let ptr;
-    // TO DO: what value types should this accept?
     if (value instanceof Selector) {
       ptr = value.ptr;
-    } else if (constants.isString(value)) { // TO DO: also accept string, e.g. "foo:barBaz:"?
-      ptr = runtime.sel_getUid(value); // TO DO: use JS or NS selector syntax?
+    } else if (constants.isString(value)) { // also accept ObjC-style name string, e.g. "foo:barBaz:"
+      ptr = runtime.sel_getUid(value);
     } else if (value instanceof Buffer) {
-      console.log('WARN: objc_selector_t.set received a raw Buffer');
+      console.log('WARN: objc_selector_t.set received a raw Buffer'); // DEBUG
       ptr = value;
     } else {
       throw new TypeError(`Expected an ObjC Selector but received ${typeof value}: ${value}`);
@@ -177,7 +164,7 @@ class ObjCRefType {
   
   constructor(type) {
     // type : object -- a ref-napi compatible type definition, most often `objc_instance_t` (e.g. when constructing `NSError**` out arguments) though can be any ref-napi compatible type object
-    this.reftype = type; // TO DO: make this private and add `get reftype()` for safety? or just apply Object.freeze()? (Q. does ref-napi bother to freeze its own type objects, or are they left mutable and user is entrusted not to bork them?)
+    this.reftype = type;
     this.size = ref.sizeof.pointer;
     this.alignment = ref.alignof.pointer;
     this.ffi_type = ffi.FFI_TYPES.pointer;
@@ -194,11 +181,11 @@ class ObjCRefType {
     //console.log('RefType.get: ', buffer)
     const data = buffer.readPointer(offset, this.reftype.size); // the thing being pointed at, e.g. AEDesc struct
     const value = this.reftype.get(data, 0, this.reftype);
-    // Ref is used purely as a wrapper; the value in it has already been unpacked (TO DO: should ref unpack lazily? when does ref-napi's pointer unpack, when returned as function's result?)
+    // Ref is used purely as a wrapper; the value in it has already been unpacked // TO DO: should Ref unpack lazily? when does ref-napi's pointer unpack, when returned as function's result? if so, wrap the pointer Buffer in Ref here and update Ref's implementation to unpack it the first/every(?) time Ref.deref() is called
     return new Ref(value);
   }
   
-  set(buffer, offset, value) { // TO DO: what should we do with offset?
+  set(buffer, offset, value) {
   //console.log('PACK REF',value)
     let ptr;
     if (value instanceof Ref) {
@@ -210,7 +197,7 @@ class ObjCRefType {
       value.__reftype = this.reftype;
     } else if (value === null) {
       ptr = ref.NULL; // some methods allow inout args to be nil, in which case nothing is returned
-    } else if (value instanceof Buffer) { // assume user knows what they're doing // TO DO: we should probably check this for ffi_type (Q. does ref.alloc attach type to buffer?) and confirm indirection level is correct
+    } else if (value instanceof Buffer) {
       ptr = value;
     } else {
       throw new TypeError(`Expected a Ref or null but received ${typeof value}: ${value}`);
@@ -257,7 +244,7 @@ const _objcTypeEncodings = {
   // bnum           // A bit field of num bits
   // ^type          // A pointer to type
   
-  // TO DO: how does ObjC encoding describe varargs?
+  // TO DO: how does an ObjC encoding string describe varargs?
   
   '?': ref.refType(ref.types.void), // An unknown type (among other things, this code is used for function pointers)
 };
@@ -364,9 +351,8 @@ class ObjCTypeEncodingParser {
     const name = this.readName(); // type name is required (without it, the encoding would be ambiguous, e.g. `{Bi}`)
     if (this.currentToken === '=') {
       this.cursor++; // step over '='
-      // TO DO: is this correct, or should it use `new`:
-      type = objcstruct.ObjCStructType(); // eslint-disable-line new-cap
-      type.objcName = name; // note: StructType's name is read-only
+      type = objcstruct.ObjCStructType(); // note: ref-struct-di's StructType does not use `new` keyword to instantiate // eslint-disable-line new-cap
+      type.objcName = name; // note: StructType's `name` is read-only
       let count = 0;
       while (this.currentToken && this.currentToken !== '}') {
         let propertyName = null;
@@ -375,7 +361,7 @@ class ObjCTypeEncodingParser {
         }
           //console.log(`${name}: read quoted name: '${propertyName}'`)
         const propertyType = this.readType();
-        type.defineProperty(propertyName ?? `\$${count}`, propertyType); // if no name given, use `$0`, `$1`, etc; TO DO: problem with this is it doesn't match correct fields in object 
+        type.defineProperty(propertyName ?? `\$${count}`, propertyType); // if no name given, use `$0`, `$1`, etc; TO DO: don't much like this; either put indexed accessors on all structs so fields can be accessed as `struct[0]`, and add named accessors when field names are known; or treat struct instances as opaque unless the full struct type is be defined in advance
         count++;
       }
       if (this.currentToken !== '}') { 
@@ -386,8 +372,8 @@ class ObjCTypeEncodingParser {
       const structEncoding = this.encoding.slice(startIndex, this.cursor);
       const existingType = objcstruct.getStructTypeByName(name);
       
-      
-      if (!existingType || existingType.objcEncoding.length < structEncoding) { // kludge; we want the most detailed definition to be kept; TO DO: e.g. 'substringWithRange:' has encoding '@32@0:8{_NSRange=QQ}16', which is not full _NSRange encoding as it lacks property names
+      // it is possible for an ObjC struct type to be defined more than once, and with different levels of detail depending on where that definition appears; therefore we need to merge these multiple definitions into one, containing as much detail as possible
+      if (!existingType || existingType.objcEncoding.length < structEncoding) { // kludge; e.g. 'substringWithRange:' has encoding '@32@0:8{_NSRange=QQ}16', which is not full _NSRange encoding as it lacks property names; TO DO: using encoding string length is not reliable (e.g. byte offsets may be omitted); better to parse this new encoding string and update existingType with any additional info
       
         type.objcEncoding = structEncoding;
         objcstruct.addStructType(type); // add this new StructType to objcstruct's cache // TO DO: might be safer to merge this type object into the cached object instead of replacing it
@@ -497,13 +483,11 @@ class ObjCTypeEncodingParser {
 }
 
 
-const typeParser = new ObjCTypeEncodingParser(); // TO DO: shared parser object is not thread-safe; either create a new instance per-use or pass encoding+cursor as arguments to read methods
-
 
 /******************************************************************************/
 
 
-const coerceObjCType = (encoding) => typeParser.parseTypeArray(encoding);
+const coerceObjCType = (encoding) => new ObjCTypeEncodingParser().parseTypeArray(encoding);
 
 
 const introspectMethod = (object, methodName) => {
@@ -535,7 +519,7 @@ const introspectMethod = (object, methodName) => {
   const sel = runtime.sel_getUid(selectorName);
   const method = object.objcMethodPtr(sel); // do not keep method pointer; objc_msgSend will look up methods itself
   if (!method || method.isNull()) { // TO DO: do class_getClassMethod/class_getInstanceMethod always return a pointer Buffer, or can they also return null/undefined? (added DEBUG below to see)
-    let msg = ''; // TO DO: smarter autosuggest (for now it only checks for a missing trailing underscore, which is the most common mistake)
+    let msg = ''; // TO DO: a smarter autosuggest would be nice to have (for now it only checks for a missing trailing underscore, which is the most common mistake)
     if (!selectorName.endsWith(':')) {
       const method2 = object.objcMethodPtr(runtime.sel_getUid(`${selectorName}:`));
       if (method2 && !method2.isNull()) { msg = ` (did you mean ${methodName}_?)`; }
@@ -544,7 +528,7 @@ const introspectMethod = (object, methodName) => {
     throw new TypeError(`No method named objc.${object.name}.${methodName}${msg}`);
   }
   const encoding = runtime.method_getTypeEncoding(method);
-  const argTypes = typeParser.parseTypeArray(encoding); // [result, target, selector,...arguments]
+  const argTypes = new ObjCTypeEncodingParser().parseTypeArray(encoding); // [result, target, selector,...arguments]
   const returnType = argTypes.shift();
   // first 2 args are always target and selector, which method wrapper already passes as pointers
   argTypes[0] = pointerType;
@@ -575,7 +559,7 @@ _totaltime = _zero;
 
 Object.assign(module.exports, ref.types, {
   
-  typeParser,
+  ObjCTypeEncodingParser,
   
   // DEBUG: performance test
   reset: () => _totaltime = _zero,

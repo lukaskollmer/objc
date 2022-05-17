@@ -20,6 +20,8 @@
 //
 
 
+// TO DO: use ref-struct-di's API for structs and struct types? or use original objc API, where structs are instantiated using [required] positional arguments, not an object of [optional] named values as ref-struct-di? e.g. objc.NSRange(1,2) vs objc.NSRange({location:1,length:2})
+
 
 // TO DO: should methods accept an object where a struct is expected, e.g. passing `{location:1, length:2}` for an NSRange argument, and perform the object-to-struct conversion automatically? (we'd need to define our own ObjCStructType codec for this, which boxes/replaces the original ref-struct-di version); it would be convenient for users (also slower, but convenience may outweigh that)
 
@@ -91,7 +93,7 @@ function defineStructType(encoding, ...names) {
 	// if the StructType does not already exist, it is created and also stored on `objc` under both its name and its encoding for reuse
 	let type = _structTypes[encoding];
 	if (!type) {
-		type = objctypes.typeParser.parseType(encoding);
+		type = new objctypes.ObjCTypeEncodingParser().parseType(encoding);
 		const objcEncoding = type.objcEncoding;
 		//console.log(`'${objcEncoding}'`, type.constructor.name)
 		if (!objcEncoding || objcEncoding[0] !== '{') { // quick-and-dirty check for a valid ObjC encoding string

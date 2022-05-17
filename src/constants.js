@@ -1,5 +1,5 @@
 
-// TO DO: Error subclasses for objc-specific errors?
+// TO DO: is it worth defining one or more Error subclasses for objc-specific errors?
 
 
 module.exports = {

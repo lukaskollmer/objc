@@ -2,24 +2,9 @@
 
 // ns, js functions for converting the standard JS types to their NS equivalents and back
 
-// TO DO: should `undefined` pass-thru as-is or be treated as TypeError (currently the latter)
+// TO DO: bridge NSSet<->Set and NSDictionary<->Map
 
-
-/*
-TO DO: still slow! e.g.:
-
-objc.ns(['one', 2, false, {a:4}, new Date()])
-
-ns(string): 0.005s -- 'one'
-ns(number): 0.004s -- 2
-ns(number): 0.005s -- 4
-ns(object): 0.016s -- {a:4}
-ns(object): 0.009s -- Date()
-ns(object): 0.044s -- [...]
-
-[objc ( one, 2, 0, { a = 4; }, "2022-02-19 15:01:46 +0000" )]
-
-*/
+// TO DO: should js() unpack NSDictionary to Map by default, with an optional flag to unpack as Object instead?
 
 'use strict';
 
@@ -114,17 +99,10 @@ const nsThrowIfUnconverted = (object) => {
 /******************************************************************************/
 // unpack
 
-// TO DO: should be able to streamline this a bit
-
-const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: what about passing optional function for unpacking dictionary items? see also TODO below
+const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => {
   // object : ObjCObject -- JS values are returned as is
   // resultIfUnconverted : function | value -- if a function, call it and return its result; otherwise return it (default behavior is to return the ObjCObject unchanged)
   let retvalue;
-  
-//let t = process.hrtime.bigint();
-  
-//  console.log('calling js()...'+object[constants.__objcObject]+';'+object[constants.__objcInstancePtr]+';')
-
   if (object === undefined) {
     throw new TypeError('objc.js() expected a value but received: undefined');
 
@@ -144,7 +122,7 @@ const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: 
     retvalue = new Date(object.timeIntervalSince1970() * 1000);
   
   } else if (object.isKindOfClass_(NSArray)) {
-    retvalue = []; // TO DO: we could return a Proxy'd Array that encapsulates the ObjC NSArray and an initially lazy JS Array and lazily converts its items from NS to JS on first access (being a Proxy, it should still appear as instanceof Array;challenges:
+    retvalue = []; // TO DO: we could return a Proxy'd Array that encapsulates the ObjC NSArray and an initially lazy JS Array and lazily converts its items from NS to JS on first access (being a Proxy, it should still appear as instanceof Array). This might be quicker than immediately converting all items to JS, assuming the JS code only needs some of the values. Challenges:
     // 1. ensuring the Proxy correctly implements all Array properties and methods; and
     // 2. handling Array mutations when the NSArray is immutable (either by copying everything to the JS Array, or by converting the NSArray to NSMutableArray)
     for (const obj of object) {
@@ -154,15 +132,12 @@ const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: 
   } else if (object.isKindOfClass_(NSDictionary)) {
     retvalue = {};
     for (const key of object) {
-      retvalue[String(key)] = js(object.objectForKey_(key), true); // TO DO: this mapping is highly problematic, as key conversions (for anything except NSString will be lossy and/or ambiguous, with no roundtripping, risks of key collisions, and likely unreadable too; if we really want a native JS structure, we might need to define our own with discrete methods for getting/setting/deleting keys (in which case we might be as well to have that wrap the NSDictionary that lazily converts NS keys and values to JS)
+      retvalue[String(key)] = js(object.objectForKey_(key), true); // caution: mapping NSDictionary to Object is problematic, as NS-to-JS key conversions for numbers and other non-string values will be lossy and/or ambiguous, e.g. @"3" and @3 will be the same key in an Object (although will be different in a Map); it might be better to unpack as Map by default
     }
 
   } else {
     retvalue = typeof resultIfUnconverted === 'function' ? resultIfUnconverted(object) : resultIfUnconverted;
   }
-  
-//console.log(`js(): ${Number(process.hrtime.bigint() - t)/1e9}µs`);
-  
   return retvalue;
 };
 
@@ -171,17 +146,19 @@ const js = (object, resultIfUnconverted = jsReturnIfUnconverted) => { // TO DO: 
 // pack
 
 const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = false) => {
+  // object : any
+  // nsThrowInUnconverted : function -- callback invoked if the given object is not bridged to ObjC
+  // returnPtr : boolean -- if false, result is a wrapped ObjCInstance or null; if true, result is a raw Buffer pointer (i.e. the wrapping step is skipped); this is used internally when recursively packing Array/Object items into an NSArray/NSDictionary
+  // Result: ObjCInstance | null -- the wrapped object; or raw Buffer if returnPtr is true
   let classObject, ptr;
   
-  // TO DO: can any of these instantiation methods return nil? if so, add null ptr checks
-  
-//let t = process.hrtime.bigint();
+  // TO DO: can any of the following ObjC instantiations fail (i.e. return nil)? if so, add NULL ptr checks and throw a descriptive Error if the JS value failed to pack as an NS object
 
   if (object === undefined) {
     throw new TypeError('objc.ns() expected a value but received: undefined');
   
   } else if (object === null) {
-    return returnPtr ? ref.NULL : object; // TO DO: check this is correct
+    return returnPtr ? ref.NULL : null; // returns a NULL pointer buffer if returnPtr is true, else null
     
   } else if (object[constants.__objcObject]) {
     return returnPtr ? object[constants.__objcObject].ptr : object;
@@ -201,7 +178,7 @@ const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = fals
     return returnPtr ? iptr_false : nsFalse;
   
   } else if (object instanceof Date) { // Date -> NSDate
-    const seconds = Number(object) / 1000; // TO DO: what if inf/nan/out of range?
+    const seconds = Number(object) / 1000;
     classObject = NSDate;
     ptr = m_dateWithTimeIntervalSince1970_(cptr_NSDate, sel_dateWithTimeIntervalSince1970_, seconds);
     
@@ -245,9 +222,6 @@ const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = fals
   } else {
     return typeof resultIfUnconverted === 'function' ? resultIfUnconverted(object) : resultIfUnconverted;    
   }
-  
-//console.log(`ns(${typeof object}): ${Number(process.hrtime.bigint() - t)/1e9}sec`);
-
   return returnPtr ? ptr : createMethodProxy(new ObjCInstance(classObject, ptr));
 };
 

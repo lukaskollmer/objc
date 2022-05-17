@@ -17,8 +17,6 @@ const constants = require('./constants');
 const runtime = require('./runtime');
 
 
-// TO DO: should Selector constructor cache new Selector objects for reuse? (this is what ObjC does natively); from JS's POV it might not be that useful (the only benefit might be that it allows Selector objects to be directly compared using `===` operator)
-
 
 class Selector {
   #__ptr;
@@ -58,7 +56,7 @@ class Selector {
   
   // accessors
   
-  tojs() { // TO DO: see above TODO re. ambiguity
+  _toPrimitive_() { // TO DO: see above TODO re. ambiguity
     // Result: string -- the method's JS (underscore-delimited) name
     return Selector.selectorNameToJS(this.name);
   }

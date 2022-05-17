@@ -11,6 +11,13 @@
 
 // TO DO: better error messages in callObjCMethod when arguments fail to pack
 
+// TO DO: how to ensure correct retain/release of ObjC instance ptrs? (up to now we've not bothered with autorelease pools, leaving ObjC objects to leak memory, but when AR pools are used to clean up we need to ensure the ObjC runtime doesn't dealloc objects while we still hold Buffer pointers to them); see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry; another option (if we move guts into C++ will be to implement ObjCObject in C++ as V8's API presumably provides GC hooks for deallocing [C/C++/ObjC] memory)
+
+// TO DO: how to support vararg methods, e.g. -[NSString stringWithFormat:]?
+
+// TO DO: should ObjCInstance.toStringTag() include ptr's hex address, to distinguish one instance from another?
+
+
 
 const util = require('util');
 
@@ -31,7 +38,7 @@ const objctypes = require('./objctypes');
 
 // the main reason for separating ObjCClass vs ObjCInstance is so that ObjCClasses can cache all of the (class+instance) method wrappers for that class, as each of those method wrappers is crazy expensive to create; this in turn means that ObjCInstances must keep a reference to their ObjCClass (while ObjCInstance really only needs the instance method cache, it's simplest just to grab the whole thing)
 
-// caution: only ObjCClass objects are cached; ObjCInstance wrappers are always created anew, thus it's possible to have multiple ObjCInstances which share the same pointer; i.e. whereas in ObjC a simple `a == b` pointer comparison is sufficient to determine object identity, JS's `===` can't be used to determine if two ObjCInstances are the same ObjC object; // TO DO: provide dedicated `objc.isSameObject(a,b)` that compares the underlying pointers
+// caution: only ObjCClass objects are cached; ObjCInstance wrappers are always created anew, thus it's possible to have multiple ObjCInstances which share the same pointer; i.e. whereas in ObjC a simple `a == b` pointer comparison is sufficient to determine object identity, JS's `===` can't be used to determine if two ObjCInstances are the same ObjC object; TBF, testing for pointer equality is not so useful and users should use -[NSObject isEqual:] to compare ObjC objects for true equality
 
 
 // same values, just different lookup keys (`objc.NAME` vs a method wrapper when processing returned ptrs)
@@ -105,9 +112,7 @@ const wrapMethod = (objcObject, methodDefinition) => {
   //
   // for efficiency, returned NSString, NSArray, etc are not automatically converted back to JS values, as we have know way of knowing if caller will pass them to another ObjC method, or wants to use them in JS now (if caller specifically wants a JS value back, they need to wrap the method call in a js() function, and likewise apply js() to any out arguments)
   //
-  // TO DO: this doesn't support varargs
-  //
-  // TO DO: somewhat annoyingly, the callObjCMethod function shows as "Proxy.callObjCMethod" in Error call stacks; ideally we want it to show as "NSFoo.bar_baz_" (note also that the Proxy appears to become the function's `this` upon its return from Proxy's `get` handler, which is just typical JS)
+  // somewhat annoyingly, the callObjCMethod function shows as "Proxy.callObjCMethod" in Error call stacks; ideally we want it to show as "NSFoo.bar_baz_" (note also that the Proxy appears to become the function's `this` upon its return from Proxy's `get` handler, which is just typical JS), but AFAIK JS doesn't allow dynamic renaming of functions (a function's `name` property is read-only) 
   //
   return function callObjCMethod(...args) { // ideally closure would be named after methodDefinition.methodName, but that's tricky; TO DO: we probably could attach a custom inspect that will display method name and argument types
     //console.log('>>callObjCMethod: '+methodDefinition.selector.name)
@@ -126,8 +131,6 @@ const wrapMethod = (objcObject, methodDefinition) => {
           }
         }
       }
-      //console.log('pack res: '+methodName+': '+(Number(process.hrtime.bigint() - t)/1e6))
-      //console.log('...callObjCMethod returning: '+ isWrappedObjCInstance(retval));
       return retval;
     } catch (e) {
       
@@ -154,9 +157,6 @@ const wrapMethod = (objcObject, methodDefinition) => {
 // these wrap ObjC class/instance objects and are, in turn, wrapped by Proxies that provide access to their ObjC methods
 
 
-// TO DO: should ObjCInstance.tojs() include ptr's hex address, to distinguish one instance from another?
-
-
 // abstract base class; wraps a pointer to an ObjC class or instance
 
 class ObjCObject {
@@ -174,7 +174,7 @@ class ObjCObject {
     return `${this.constructor.name}=${this.name}`;
   }
   
-  [Symbol.toString]() { // TO DO: this returns ObjC's description string, which might not be what we want, but let's see how it goes for now
+  [Symbol.toString]() { // this returns ObjC's description string
     return this.__callObjCMethod__('description').UTF8String();
   }
   
@@ -223,11 +223,11 @@ class ObjCClass extends ObjCObject {
     return this.__name;
   }
   
-  tojs(hint = 'default') {
+  _toPrimitive_(hint = 'default') { // TO DO: what should this return? (the real problem is JS's toPrimitive, which is really dumb when applied to complex objects that cannot be usefully mapped to a string; best we can do is return a representation of the object or display purposes only)
     // called by Proxy wrapper's toPrimitive function
     // hint : 'number' | 'string' | 'default'
     // Result: number | string
-    return hint === 'number' ? Number.NaN : `[ObjCClass: ${this.name}]`; // TO DO: how to represent a class? a parenthesized literal expression might be best, e.g. `(objc.NSString)`, as it is both self-descriptive and can-be copy+pasted+evaluated to recreate it; however, that doesn't work so well with instances, where we'd need to replicate the constructor and arguments as literals as well (we might eventually do that for the bridged Foundation types, but anything else is probably best using the ObjC description string)
+    return hint === 'number' ? Number.NaN : `[ObjCClass: ${this.name}]`;
   }
   
   objcMethodPtr(sel) { // looks up and returns the C pointer to the specified class method; used by introspectMethod
@@ -267,7 +267,7 @@ class ObjCInstance extends ObjCObject {
     this.classObject = classObject;
     // cache the wrapped ObjC instance methods (also includes internal keys for extracting the instance's C pointer)
     this.cachedMethods = {
-      'class': () => this.classObject, // TO DO: is it good/safe/wise to override the ObjC object's own -class method like this? yes, the caller will want the proxied ObjCClass, but what if ObjC runtime does swizzling (and what about class clusters)? e.g. if true class is __NSCFBoolean, what does -[NSNumber class] return?
+      'class': () => this.classObject, // TO DO: is it good/safe/wise to override the ObjC object's own -class method like this? what if ObjC runtime does swizzling? and what about class clusters, e.g. if true class is __NSCFBoolean, what does -[NSNumber class] return? probably best to remove this
       [constants.__objcClassPtr]: null,
       [constants.__objcInstancePtr]: ptr,
     };
@@ -278,7 +278,7 @@ class ObjCInstance extends ObjCObject {
     return runtime.object_getClassName(this.ptr);
   }
   
-  tojs(hint = 'default') {
+  _toPrimitive_(hint = 'default') {
     // called by Proxy wrapper's toPrimitive function
     // hint : 'number' | 'string' | 'default'
     // Result: number | string
@@ -288,7 +288,7 @@ class ObjCInstance extends ObjCObject {
     case 'string':
       return this[Symbol.toString](); // ObjC description string // for now, this invokes [NSObject description] and returns that ObjC-style string, though we might want to adjust that later to bring it more in line with JS's toPrimitive
     default:
-      return this[Symbol.toString](); // TO DO: need exception for NSNumber (not __NSCFBoolean) and NSArray containing a single NSNumber (since JS seems to like reducing `[3]` to `3`); also, should we allow this to return undefined/null, so Proxy can use it for valueOf too? (on returning undefined, the Proxy would return the proxyObject unchanged, which I believe is ther expected behavior for valueOf when it encounters JS objects that can't be reduced to primitives without data loss, whereas toPrimitive always forces objects to string or number and damn all the data loss)
+      return this[Symbol.toString](); // kludge; TO DO: need exception for NSNumber (not __NSCFBoolean) and NSArray containing a single NSNumber (since JS seems to like reducing `[3]` to `3`); also, should we allow this to return undefined/null, so Proxy can use it for valueOf too? (on returning undefined, the Proxy would return the proxyObject unchanged, which I believe is ther expected behavior for valueOf when it encounters JS objects that can't be reduced to primitives without data loss, whereas toPrimitive always forces objects to string or number and damn all the data loss); maybe use js() to convert ObjC object to JS value, then call toPrimitive on that
     }
   }
   
@@ -315,10 +315,6 @@ class ObjCInstance extends ObjCObject {
 // this lazily generates function wrappers for ObjC methods the first time they’re called by client code
 // (creating ObjC method wrappers is expensive as libobjc's introspection functions are sloooow)
 // note that this wrapper is largely transparent to JS, so e.g. `obj instanceof ObjCInstance` will still return true if obj is a method proxy wrapper around an ObjCInstance (which is what we want)
-
-// TO DO: is there a way to rename Proxy to MethodProxy? (we don't really want to call the function MethodProxy as it's not a `new`-based constructor, even though it constructs an object, and there's good reason for es-lint wanting to associate CapNames with `new` constructors for visual consistency [ignoring entrenched warts such as `Date()`])
-
-// TO DO: to what extent can NSNumber, NSString, NSDate, NSArray, NSDictionary ObjCInstances be made interchangeable with corresponding JS types (boolean/Number, String, Date, Array, object)? e.g. can `nsString + toDescription`, `toDescription + nsString`, and `nsString + nsString` all be made to work the same as `toDescription + toDescription`, or are we going to hit a wall with JS's cranky type system (i.e. while JS's string primitives are non-objects, it also provides String objects, so if we can masquerade an NSString as one of those - and likewise for Date, Array, and object (NSNumbers are not as common so we could live with the discrepancy there, although toPrimitive should reduce it) - then this reduces the need for user to call obj.js())
 
 
 
@@ -350,7 +346,7 @@ const createMethodProxy = obj => {
         case constants.__objcObject:
           return objcObject;
         
-        case '__callObjCMethod__': // TO DO: make this a Symbol? or can we live with one "magic method" exposed as string? (fairly sure ObjC doesn't use double underscores in any method names; and if there was an ObjC method named `_call_` then it’d have zero extra arguments whereas this has at least one, so any collision will soon be resolved by something barfing an error)
+        case '__callObjCMethod__':
           return (name, ...args) => objcObject.__callObjCMethod__(name, ...args);
                 
         // inspection/coercion
@@ -374,13 +370,13 @@ const createMethodProxy = obj => {
             objcObject.toPrimitive('string'); // quick-n-dirty
           }
         case Symbol.toStringTag: // describes the ObjC object's construction, including presence of method Proxy wrapper; JS will call this when generating its '[object TAG]' representation
-          return `Wrapped-${objcObject[Symbol.toStringTag]}`; // TO DO: how best to indicate wrapper's addition? parens/brackets/braces/'wrapped-'?
+          return `Wrapped-${objcObject[Symbol.toStringTag]}`;
         case Symbol.toPrimitive:
           return (hint => {
             // hint : 'number' | 'string' | 'default'
             // Result: number | string
             if (objcObject instanceof ObjCClass) {
-              return objcObject.tojs(hint);
+              return objcObject._toPrimitive_(hint);
             }
             let obj = codecs.js(proxyObject); // return as-is if not converted to JS primitive
             // first, deal with any types that must/can be reduced to numbers...
