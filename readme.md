@@ -9,6 +9,7 @@
 $ npm install --save objc
 ```
 
+*Note: on ARM Macs, you may need to prepend `npm_config_build_from_source=true` to this command as the subdependency [ref-napi](https://github.com/node-ffi-napi/ref-napi) (as of version 3.0.3) does not include a prebuilt bindary for `darwin-arm64`. See "troubleshooting" below for more information.*
 
 ## Usage
 
@@ -246,6 +247,23 @@ const LKGreeter = objc.createClass('LKGreeter', 'NSObject', {
 LKGreeter.new().greet('Lukas'); // => 'Hello, Lukas!'
 ```
 **Note**: You might have to specify individual offsets in the type encoding, see [this example](/examples/delegate.js).
+
+## Troubleshooting
+
+### "No native build was found"
+
+If, at runtime (e.g. when running `npm run test`), you encounter this error:
+
+> Error: No native build was found for `platform=darwin arch=arm64 runtime=node abi=93 uv=1 armv=8 libc=glibc node=16.19.0`
+> loaded from: `/Users/some_user/objc/node_modules/ref-napi`
+
+... it's because the [ref-napi](https://github.com/node-ffi-napi/ref-napi) release (as of version 3.0.3) includes [prebuilt binaries for various processors, but not for `darwin-arm64` as used on ARM Macs](https://github.com/node-ffi-napi/ref-napi/issues/51#issuecomment-991746870).
+
+To work around this, either switch your terminal to Rosetta mode (not recommended), or (probably best to remove `node_modules`, then) reinstall with this environment arg:
+
+```sh
+npm_config_build_from_source=true npm install --save objc
+```
 
 ## Roadmap
 In the future, I'd like to add support for:
