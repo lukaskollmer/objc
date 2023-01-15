@@ -60,6 +60,8 @@ struct.defineStructType('{_NSRange="location"Q"length"Q}', 'NSRange');
 /******************************************************************************/
 // built-in `objc` objects and functions
 
+const NSAutoreleasePool = instance.getClassByName('NSAutoreleasePool');
+
 const _builtins = Object.create(null);
   
 // import frameworks
@@ -88,6 +90,15 @@ _builtins.isStructType = struct.isStructType;
 _builtins.isStruct     = struct.isStruct;
 
 _builtins.defineClass  = subclass.defineClass;
+
+_builtins.auto = (fn, ...args) => {
+  const pool = NSAutoreleasePool.alloc().init();
+  try {
+    return fn(...args);
+  } finally {
+    pool.drain();
+  }
+};
 
 // TO DO: defineFunction(ENCODING,NAME) for wrapping C functions, e.g. NSStringFromRect
 

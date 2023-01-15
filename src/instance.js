@@ -11,6 +11,8 @@
 
 // TO DO: better error messages in callObjCMethod when arguments fail to pack
 
+// TO DO: how to ensure correct retain/release of ObjC instance ptrs? (up to now we've not bothered with autorelease pools, leaving ObjC objects to leak memory, but when AR pools are used to clean up we need to ensure the ObjC runtime doesn't dealloc objects while we still hold Buffer pointers to them); see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry; another option (if we move guts into C++ will be to implement ObjCObject in C++ as V8's API presumably provides GC hooks for deallocing [C/C++/ObjC] memory)
+
 
 const util = require('util');
 
@@ -122,7 +124,7 @@ const wrapMethod = (objcObject, methodDefinition) => {
           const box = args[i];
           if (box instanceof Ref && !box.__outptr.equals(box.__inptr)) {
             // box.__outptr.readPointer().isNull() // TO DO: do we need a NULL check here?
-            box.value = box.__reftype.get(box.__outptr, 0, box.__reftype);
+            box.value = box.ffi_type.reftype.get(box.__outptr, 0, box.ffi_type.reftype);
           }
         }
       }

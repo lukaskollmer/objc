@@ -1,9 +1,39 @@
 #!/usr/bin/env node 
 
+const ref = require('ref-napi')
 const objc = require('objc')
 
 //let v = objc.NSString.stringWithString_('')
 
+
+objc.defineStruct('{AEDesc="descriptorType"I"dataHandle"?}');
+
+// <opaque name='AEDataStorageType' type64='^{OpaqueAEDataStorageType=}'/>
+objc.defineStruct('{OpaqueAEDataStorageType=}');
+
+
+let desc = objc.NSAppleEventDescriptor.descriptorWithString_('test')
+
+//console.log(desc.aeDesc())
+
+const ptrType = ref.refType(ref.types.void)
+
+const b = Buffer.alloc(8)
+
+b.writeUInt64LE(Math.pow(2, 32))
+
+console.log(b)
+
+const p = ref.alloc(ptrType)
+
+console.log(p)
+
+console.log(p.deref())
+
+console.log(p.deref().deref())
+
+
+/*
 
 let code = "<invalid AppleScript code>"
 
@@ -36,4 +66,5 @@ console.log("compileAndReturnError: success=" + res + '  err=' + error)
 
 console.log('test class: '+objc.NSString)
 
+*/
 

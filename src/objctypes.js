@@ -16,6 +16,10 @@
 //  NSRectPointer '{CGRect="origin"{CGPoint}"size"{CGSize}}'
 //
 
+
+// TO DO: FIX: how to represent opaque pointers? e.g. -[NSData bytes] currently returns Ref object, but deref returns null and there's no Buffer bound to it (ref-napi's logic is tricky to follow, but it allows Buffers to be used as pointer objects); might want to rename Ref to Pointer and have it encapsulate either an object (inc. JS primitive) or a Buffer, depending on whether user instantiates to pass in or objc instantiates it to pass out
+
+
 // TO DO: ref-array-napi, ref-union-napi
 
 // TO DO: ref-bitfield doesn't seem to have napi version
@@ -53,6 +57,9 @@ const pointerType = ref.refType(ref.types.void);
 //
 // note: when TYPE.indirection===1, ffi.ForeignFunction calls TYPE.set/get() to convert the given data to/from C (this is counterintuitive, but ffi treats 0 as an error along with other falsy values)
 //
+
+
+// TO DO: check these work correctly with ref-napi
 
 
 const objc_class_t = {
@@ -157,7 +164,7 @@ const objc_opaqueblock_t = { // TO DO: move this to ./block.js?
 };
 
 
-class ObjCRefType {
+class ObjCPtrType {
   // a ref-napi compatible type definition for an objc.Ref pointer object
   //
   // Note: whereas ref-napi constructs a pointer value using:
@@ -168,20 +175,20 @@ class ObjCRefType {
   //
   //  const ptr = new objc.Ref([VALUE])
   //
-  // This does not require a ref-napi type definition to construct it; instead, the Ref's type - an instance of ObjCRefType - is created and attached to it when it is passed as an argument to/returned as a result from an ObjC method.
+  // This does not require a ref-napi type definition to construct it; instead, the Ref's type - an instance of ObjCPtrType - is created and attached to it when it is passed as an argument to/returned as a result from an ObjC method.
   //
   // (While a ref-napi pointer value can also be created and passed to an ObjC method, it is up to the user to ensure it is of the correct type; the objc bridge cannot check it and the ObjC runtime will crash if it is not.)
   
   
   // TO DO: get/set methods' fragile (dynamic) `this` bindings below assumes that ffi/ref will never bind a type object's get/set functions to variables to be called later, but will always call them directly on body of type object, i.e. `TYPE.get(...)`, never `const f = TYPE.get; f(...)`; however, most ref-napi types are plain old objects containing unbound functions, which does allow such usage; therefore, it'd be safest to avoid using `this` in these methods
   
-  constructor(type) {
+  constructor(type, indirection = 1) {
     // type : object -- a ref-napi compatible type definition, most often `objc_instance_t` (e.g. when constructing `NSError**` out arguments) though can be any ref-napi compatible type object
-    this.reftype = type; // TO DO: make this private and add `get reftype()` for safety? or just apply Object.freeze()? (Q. does ref-napi bother to freeze its own type objects, or are they left mutable and user is entrusted not to bork them?)
+    this.reftype = type; // TO DO: make this private and add `get reftype()` for safety? or just apply Object.freeze()? (Q. does ref-napi bother to freeze its own type objects, or are they left mutable and user is entrusted not to bork them?) // ref-napi would copy type and increment its indirection
     this.size = ref.sizeof.pointer;
     this.alignment = ref.alignof.pointer;
-    this.ffi_type = ffi.FFI_TYPES.pointer;
-    this.indirection = 1;
+    this.ffi_type = ffi.FFI_TYPES.pointer; // Q. is this appropriate?
+    this.indirection = indirection;
   }
   
   get name() { return `${this.reftype.objcName || this.reftype.name || 'void'}*`; } // TO DO: is this appropriate syntax? (it is not the syntax used by ObjC encoding strings, but ref.types.TYPE.name); TO DO: should we standardize on `objcName` for our own preferred names (e.g. 'CGPoint')
@@ -191,23 +198,22 @@ class ObjCRefType {
   }
   
   get(buffer, offset) { // e.g. -[NSAppleEventDescriptor aeDesc] returns `^{AEDesc}`, i.e. a pointer to an AEDesc struct
-    //console.log('RefType.get: ', buffer)
-    const data = buffer.readPointer(offset, this.reftype.size); // the thing being pointed at, e.g. AEDesc struct
-    const value = this.reftype.get(data, 0, this.reftype);
-    // Ref is used purely as a wrapper; the value in it has already been unpacked (TO DO: should ref unpack lazily? when does ref-napi's pointer unpack, when returned as function's result?)
-    return new Ref(value);
+    //console.log('PtrType.get: ', buffer)
+    // buffer's content is a pointer (void*)
+    const ptr = Buffer.from(buffer, offset, ref.sizeof.pointer); // copy the address
+    return new Ref(ptr, this, true);
   }
   
-  set(buffer, offset, value) { // TO DO: what should we do with offset?
+  set(buffer, offset, value) {
   //console.log('PACK REF',value)
     let ptr;
     if (value instanceof Ref) {
       ptr = ref.alloc(pointerType);
       this.reftype.set(ptr, offset, value.value, this.reftype);
-      // attach [copy of] ptr to Ref, so that method wrapper can check if it has changed and rewrap if it has
+      // attach [copy of] ptr to Ref, so that method wrapper can check if it has changed and rewrap if it has // TO DO: think this is wrong: it's the pointee that changes
       value.__outptr = ptr;
       value.__inptr = Buffer.from(ptr);
-      value.__reftype = this.reftype;
+      value.ffi_type = this;
     } else if (value === null) {
       ptr = ref.NULL; // some methods allow inout args to be nil, in which case nothing is returned
     } else if (value instanceof Buffer) { // assume user knows what they're doing // TO DO: we should probably check this for ffi_type (Q. does ref.alloc attach type to buffer?) and confirm indirection level is correct
@@ -220,7 +226,7 @@ class ObjCRefType {
 }
 
 
-const objc_inout_t = new ObjCRefType(objc_instance_t); // most commonly used ObjC pointer type, `id*` (e.g. `NSError**`)
+const objc_inout_t = new ObjCPtrType(objc_instance_t); // most commonly used ObjC pointer type, `id*` (e.g. `NSError**`)
 
 
 /******************************************************************************/
@@ -463,7 +469,7 @@ class ObjCTypeEncodingParser {
       }
     }
     while ('1234567890'.includes(this.currentToken)) { this.cursor++; } // skip #bits offset
-    if (indirection > 0) { type = new ObjCRefType(type, indirection); }
+    if (indirection > 0) { type = new ObjCPtrType(type, indirection); }
     return type; // cursor is positioned on first character of next type (or undefined if end of encoding)
   }
   
@@ -551,7 +557,7 @@ const introspectMethod = (object, methodName) => {
   argTypes[1] = pointerType;
   let inoutIndexes = [];
   for (let [i, arg] of Object.entries(argTypes.slice(2))) {
-    if (arg instanceof ObjCRefType) { inoutIndexes.push(i); }
+    if (arg instanceof ObjCPtrType) { inoutIndexes.push(i); }
   }
   return { // used in callObjCMethod
     methodName, // used in error messages
@@ -593,7 +599,7 @@ Object.assign(module.exports, ref.types, {
   objc_class_t,
   objc_selector_t,
   objc_opaqueblock_t,
-  ObjCRefType, // constructor for ref-napi compatible type that packs and unpacks an objc.Ref
+  ObjCPtrType, // constructor for ref-napi compatible type that packs and unpacks an objc.Ref
   
   // introspection
   coerceObjCType, // unlike ref.coerceType, which takes a single C type name and returns a single ref type object, this takes a complete ObjC encoding string describing 1 or more types and returns an Array of ref-compatible type objects

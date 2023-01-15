@@ -213,7 +213,7 @@ const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = fals
         m_addObject_(ptr, sel_addObject_, ns(item, nsThrowIfUnconverted, true));
       }
     } catch (e) {
-      console.log(e)
+      console.log('objc.ns had problem packing Array into NSArray: ', e)
       if (e instanceof TypeError) {
         return resultIfUnconverted === 'function' ? resultIfUnconverted(object) : resultIfUnconverted;
       } else {
@@ -234,7 +234,7 @@ const ns = (object, resultIfUnconverted = nsThrowIfUnconverted, returnPtr = fals
                                  m_stringWithUTF8String_(cptr_NSString, sel_stringWithUTF8String_, key));
       }
     } catch (e) {
-      console.log(e)
+      console.log('objc.ns had problem packing Object into NSDictionary: ', e)
       if (e instanceof TypeError) {
         return resultIfUnconverted === 'function' ? resultIfUnconverted(object) : resultIfUnconverted;
       } else {
