@@ -58,5 +58,5 @@ module.exports = libobjc;
 module.exports.classExists          = classExists;
 module.exports.getSymbol            = getSymbol;
 
-module.exports[util.inspect.custom] = () => '[object objc.__internal__.runtime]'; // TO DO: crude, but any user sufficiently advanced to perform this magic this had best read the module source and corresponding ObjC documentation
+module.exports[util.inspect.custom] = () => '[object objc.__internal__.runtime]'; // noise reduction when inspecting `objc` object
 

@@ -1,6 +1,9 @@
 // subclass an ObjC class in JS
 
 
+// TO DO: how to delegate to an ObjC superclass method from a JS method?
+
+
 const ffi = require('ffi-napi');
 const ref = require('ref-napi');
 

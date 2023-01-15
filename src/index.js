@@ -121,13 +121,13 @@ module.exports = new Proxy(_builtins, {
       
         retval = instance.getClassByName(key) 
                 ?? struct.getStructTypeByName(key) 
-                ?? block.getBlockClassByName(key); // KLUDGE: TO DO: this won't prevent name masking (e.g. if a block named 'Foo' is masked by a class or struct also named 'Foo'); we really want to have one cache
+                ?? block.getBlockClassByName(key); // caution: this doesn't check for or prevent name masking, e.g. given a class named 'Foo' and a struct also named 'Foo', the class definition is returned first and the struct definition is inaccessible; TO DO: ideally there should be a single cache shared by all wrapper types (ObjC class, ObjC block, C struct, C function), so that any conflicting names can be detected
     
         if (retval === undefined) { // not a class or struct/block type, so see if we can find a constant with that name
           // note: this only works for [e.g.] NSString constants; primitive constants are typically defined in header, not object file, so aren't runtime-accessible (at least, not without bridgesupport XML), e.g.:
           //
-          //  console.log(objc.NSAppleScriptErrorAppName) // this works
-          //  console.log(objc.NSUTF8StringEncoding) // this doesn't
+          //  console.log(objc.NSAppleScriptErrorAppName) // this works (the constant is an NSString)
+          //  console.log(objc.NSUTF8StringEncoding) // this doesn't (the constant is a C int defined in .h file)
           //
           retval = instance.getObjCSymbolByName(key);
           if (!retval) { throw new Error(`Not found: 'objc.${key}'`); }
