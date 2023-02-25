@@ -93,7 +93,8 @@ function defineStructType(encoding, ...names) {
 	// if the StructType does not already exist, it is created and also stored on `objc` under both its name and its encoding for reuse
 	let type = _structTypes[encoding];
 	if (!type) {
-		type = new objctypes.ObjCTypeEncodingParser().parseType(encoding);
+	  const typeParser = new objctypes.ObjCTypeEncodingParser(encoding);
+		type = typeParser.parseType();
 		const objcEncoding = type.objcEncoding;
 		//console.log(`'${objcEncoding}'`, type.constructor.name)
 		if (!objcEncoding || objcEncoding[0] !== '{') { // quick-and-dirty check for a valid ObjC encoding string

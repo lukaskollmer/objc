@@ -294,6 +294,12 @@ class ObjCTypeEncodingParser {
   encoding;
   cursor;
   
+  constructor(encoding) {
+    // encoding : string -- an ObjC type encoding string, e.g. "o^@", "@:@io^@"
+    this.encoding = encoding;
+    this.cursor = 0;
+  }
+  
   get currentToken() { return this.encoding[this.cursor]; }
   get nextToken() { return this.encoding[this.cursor + 1]; }
   
@@ -475,25 +481,19 @@ class ObjCTypeEncodingParser {
   
   // public API: parse methods consume a complete encoding string and return a type object or array of type objects
 
-  parseType(encoding) {
-    // parse a single ObjC type encoding
-    // encoding : string -- an ObjC type encoding string, e.g. "o^@"
+  parseType() {
+    // parse a single ObjC type encoding, e.g. "o^@"
     // Result: object -- a ref-napi compatible type definition, suitable for use in ffi-napi
     // e.g. .bridgesupport files normally define each argument/member separately so use parseType() for those
-    this.encoding = encoding;
-    this.cursor = 0;
     let type = this.readType();
     if (this.cursor !== this.encoding.length) { throw new Error(`Bad type encoding '${encoding}'`); }
     return type;
   }
 
-  parseTypeArray(encoding) {
-    // parse a sequence of one or more ObjC type encodings; typically a method, struct, or block’s type
-    // encoding : string -- an ObjC type encoding string, e.g. "@:@io^@"
+  parseTypeArray() {
+    // parse a sequence of one or more ObjC type encodings; typically a method, struct, or block’s type, e.g. "@:@io^@"
     // Result: [object,...] -- one or more ref-napi compatible type definitions, suitable for use in ffi-napi // TO DO: should result be [returnType,[argType,...]]? this is what ffi APIs expect and it'd save caller having to shift the return type off the Array
     // e.g. method signatures obtained via ObjC's introspection APIs
-    this.encoding = encoding;
-    this.cursor = 0;
     const types = [];
     do {
       types.push(this.readType());
@@ -503,13 +503,13 @@ class ObjCTypeEncodingParser {
 }
 
 
-const typeParser = new ObjCTypeEncodingParser(); // TO DO: shared parser object is not thread-safe; either create a new instance per-use or pass encoding+cursor as arguments to read methods
-
-
 /******************************************************************************/
 
 
-const coerceObjCType = (encoding) => typeParser.parseTypeArray(encoding);
+const coerceObjCType = (encoding) => { 
+  const typeParser = new ObjCTypeEncodingParser(encoding);
+  return typeParser.parseTypeArray();
+}
 
 
 const introspectMethod = (object, methodName) => {
@@ -550,7 +550,8 @@ const introspectMethod = (object, methodName) => {
     throw new TypeError(`No method named objc.${object.name}.${methodName}${msg}`);
   }
   const encoding = runtime.method_getTypeEncoding(method);
-  const argTypes = typeParser.parseTypeArray(encoding); // [result, target, selector,...arguments]
+  const typeParser = new ObjCTypeEncodingParser(encoding);
+  const argTypes = typeParser.parseTypeArray(); // [result, target, selector,...arguments]
   const returnType = argTypes.shift();
   // first 2 args are always target and selector, which method wrapper already passes as pointers
   argTypes[0] = pointerType;
@@ -581,7 +582,7 @@ _totaltime = _zero;
 
 Object.assign(module.exports, ref.types, {
   
-  typeParser,
+  ObjCTypeEncodingParser,
   
   // DEBUG: performance test
   reset: () => _totaltime = _zero,
