@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 'use strict';
 
 const objc = require('../src/index');
@@ -8,4 +10,4 @@ const {
 
 let username = NSProcessInfo.processInfo().userName();
 
-console.log(`Your username is: ${username}`);
+console.log(`Your username is: ${username}`); // "Your username is: ..."

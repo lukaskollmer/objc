@@ -1,60 +1,32 @@
+
+const constants = require('./constants');
 const runtime = require('./runtime');
-const Block = require('./block');
+const subclass = require('./subclass');
 
-const startCase = string => string[0].toUpperCase() + string.substr(1);
 
-// Swizzle a class or instance method
-// cls:       either a wrapped class (like what you get from `objc.NSDate`) or the classname as a string
-// selector:  selector of the method you want to swizzle, as a string
-// fn:        your new implementation, as a javascript function
-// [type]:    whether you want to swizzle a class or instance method
-// returns a function that restores the original implementation
-module.exports = (cls, selector, fn, type = 'instance') => {
-  if (!['instance', 'class'].includes(type)) {
-    throw new Error(`Invalid argument '${type}' passed as type`);
-  }
-
-  if (typeof cls === 'string' || cls instanceof String) {
-    cls = runtime.objc_getClass(cls);
-  } else {
-    cls = cls.class();
-  }
-
-  if (type === 'class') {
-    cls = runtime.object_getClass(cls);
-  }
-
-  const originalSelector = runtime.sel_getUid(selector);
-  const swizzledSelector = runtime.sel_getUid(`xxx__${selector}`);
-
-  const getMethod = runtime[`class_get${startCase(type)}Method`];
-
-  const originalMethod = getMethod(cls, originalSelector);
-
-  // Create the block for the method's implementation
-  const returnType = runtime.method_copyReturnType(originalMethod);
-  const argc = runtime.method_getNumberOfArguments(originalMethod);
-  const argtypes = [];
-
-  for (let i = 0; i < argc; i++) {
-    argtypes.push(runtime.method_copyArgumentType(originalMethod, i));
-  }
-
-  const block = new Block(fn, returnType, argtypes);
-
-  const success = runtime.class_addMethod(
-    cls,
-    swizzledSelector,
-    runtime.imp_implementationWithBlock(block.makeBlock()),
-    runtime.method_getTypeEncoding(originalMethod)
-  );
-
-  if (!success) {
-    throw new Error(`Unable to add method '${selector}' to class ${runtime.class_getName(cls)}`);
-  }
-
-  const swizzledMethod = getMethod(cls, swizzledSelector);
-  runtime.method_exchangeImplementations(originalMethod, swizzledMethod);
-
-  return () => runtime.method_exchangeImplementations(originalMethod, swizzledMethod);
+module.exports.swizzle = (classObject, selectorName, fn, isClassMethod = false) => {
+  // Swizzle a class or instance method
+  // classObject : ObjCClass -- wrapped ObjCClass, e.g. `objc.NSDate`
+  // selectorName :  string -- NS-style name of the method to swizzle, e.g. "foo:barBaz:"
+  // fn : function -- the new implementation; this must match ObjC method's arguments and return value
+  // Result: function -- a swapMethods function that restores the original implementation
+  let dest = classObject[constants.__objcClassPtr];
+  if (isClassMethod) { dest = runtime.object_getClass(dest); }
+  
+  const swizzledName = `xxx__${selectorName}`; // TO DO: is there a standard naming convention for swizzled methods?
+  const originalSelector = runtime.sel_getUid(selectorName);
+  const swizzledSelector = runtime.sel_getUid(swizzledName);
+  
+  const getMethod = isClassMethod ? runtime.class_getClassMethod : runtime.class_getInstanceMethod;
+  
+  const originalMethod = getMethod(dest, originalSelector);
+  const success = subclass.addMethod(dest, swizzledSelector, runtime.method_getTypeEncoding(originalMethod), fn);
+  if (!success) { throw new Error(`Unable to add method '${selectorName}' to class ${classObject}`); }
+  const swizzledMethod = getMethod(dest, swizzledSelector);
+  
+  const swapMethods = () => runtime.method_exchangeImplementations(originalMethod, swizzledMethod);
+  swapMethods.swizzledName = swizzledName;
+  swapMethods();
+  return swapMethods;
 };
+

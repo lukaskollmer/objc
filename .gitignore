@@ -6,3 +6,4 @@ build/
 yarn-error.log
 .nyc_output/
 coverage/
+~*

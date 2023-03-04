@@ -1,64 +1,76 @@
 // eslint-disable-next-line camelcase
-const {sel_getUid, sel_getName} = require('./runtime');
 
-const cache = {};
+// selector -- JS wrapper for ObjC SEL (ObjC method name)
+//
+// includes methods for converting ObjC-style (colon-delimited) selector names to JS-style method names and back
+//
+// also used in ObjC methods that take selectors as arguments/return selectors as result
 
-const joinSelectorWithPossiblePermutations = (selector, permutations) => {
-  const split = selector.split('_');
-  const methodName = split.shift();
 
-  const selectors = [];
-  permutations.forEach(permutation => {
-    // eslint-disable-next-line brace-style, max-statements-per-line
-    selectors.push(permutation.reduce((acc, val, index) => { return acc + val + split[index]; }, methodName));
-  });
 
-  return selectors;
-};
+// TO DO: JS<->NS name conversions are almost but not quite 100% stable; the one case that'll trip up method name conversion is 2 or more contiguous colons, e.g. `foo_bar::` (which afaik is legal, if not common nor recommended), as that will, in the current implementation, map to `foo__bar__`, which then maps back to `foo_bar_`, not `foo_bar::` (since double underscores in JS map to single underscores in SEL), making any such ObjC methods inaccessible from JS
 
-const getPossibleSelectorNames = selector => {
-  if (!selector.includes('_')) {
-    return [selector];
-  }
+// BTW, once the mapping is finalized and implemented as Selector methods, it is trivial to provide a CLI utility script that reads an NS-style selector name string from line input and prints its JS representation to stdout (and vice-versa), and tell users who need assistance translating a method’s syntax to go use that
 
-  const n = selector.split('_').length - 1;
 
-  let permutations = cache[n];
+const constants = require('./constants');
+const runtime = require('./runtime');
 
-  if (typeof permutations !== 'undefined') {
-    return joinSelectorWithPossiblePermutations(selector, permutations);
-  }
 
-  permutations = [];
-
-  const numberOfPermutations = Math.pow(2, n);
-  for (let i = 0; i < numberOfPermutations; i++) {
-    permutations.push([]);
-    for (let j = 0; j < n; j++) {
-      permutations[i][j] = i & (1 << j) ? '_' : ':';
-    }
-  }
-
-  cache[n] = permutations;
-  return joinSelectorWithPossiblePermutations(selector, permutations);
-};
 
 class Selector {
-  constructor(input) {
-    if (typeof input === 'string') {
-      this.__ptr = sel_getUid(input);
+  #__ptr;
+  
+  // utility functions for converting between NS- and JS-style method names, e.g. `foo:barBaz:` <-> `foo_barBaz_`
+  // (these are attached to Selector 'class' simply to avoid further pollution of top-level `objc` namespace)
+  
+  static selectorNameFromJS(name) {
+    return name.replace(/__?/g, s => s.length === 1 ? ':' : '_'); // TO DO: see TODO above re. resolving remaining ambiguity
+  }
+  
+  static selectorNameToJS(name) {
+    return name.replace(/[:_]/g, s => { // TO DO: see TODO above re. resolving remaining ambiguity
+      switch (s) {
+      case ':':
+        return '_';
+      case '_':
+        return '__';
+      }
+    });
+  }
+  
+  // constructors
+  
+  constructor(input) { // create a Selector from string (e.g. 'foo:bar:') or existing SEL ptr
+    // caution: this (public) constructor does not type check to ensure the given value is a string/SEL
+    if (constants.isString(input)) {
+      this.#__ptr = runtime.sel_getUid(input);
     } else {
-      this.__ptr = input;
+      this.#__ptr = input;
     }
   }
-
-  get name() {
-    return sel_getName(this.__ptr);
+  
+  static fromjs(selectorName) { // create a Selector from JS-style name, e.g. "foo_bar_"
+    return new Selector(Selector.selectorNameFromJS(selectorName));
+  }
+  
+  // accessors
+  
+  _toPrimitive_() { // TO DO: see above TODO re. ambiguity
+    // Result: string -- the method's JS (underscore-delimited) name
+    return Selector.selectorNameToJS(this.name);
   }
 
-  permutations() {
-    return getPossibleSelectorNames(this.name).map(p => new Selector(p));
+  get name() { 
+    // Result: string -- the method's ObjC (colon-delimited) name
+    return runtime.sel_getName(this.#__ptr);
   }
+  
+  get ptr() { return this.#__ptr; }
+  
+  get [String.toStringTag]() { `Selector=${this.name}` }
 }
+
+
 
 module.exports = Selector;

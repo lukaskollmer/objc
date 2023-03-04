@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 'use strict';
 
 const objc = require('../src/index');
@@ -7,27 +9,25 @@ const {
 	NSMutableArray
 } = objc;
 
-let array = NSArray.arrayWithArray_(["Hey", "missy", "you", "so", "fine"]);
-//console.log("array:", array);
+let nsarray = NSArray.arrayWithArray_(["Hey", "missy", "you", "so", "fine"]);
+console.log("nsarray:", nsarray);
 
-//console.log("count:", array.count());
+console.log("count:", nsarray.count());
 
-//console.log("array[1]:", array.objectAtIndex_(1));
-//console.log("first object:", array.firstObject());
+console.log("nsarray[1]:", nsarray.objectAtIndex_(1));
+console.log("first object:", nsarray.firstObject());
 
-// Sort
-let sortedUsingSelector = array.sortedArrayUsingSelector_("caseInsensitiveCompare:")
-console.log("sorted", sortedUsingSelector);
+// sorted alphabetically: [objc ( fine, Hey, missy, so, you )]
+console.log("sorted alphabetically:", nsarray.sortedArrayUsingSelector_("caseInsensitiveCompare:"));
 
-let asJSArray = objc.js(array);
-//console.log('js:', asJSArray);
+console.log('js array:', objc.js(nsarray));
 
-let nsarrayFromJs = objc.ns(['missy', 'you', 'so', 'fine']);
-//console.log('ns:', nsarrayFromJs);
+nsarray = objc.ns(['Hey', 'missy', 'you', 'so', 'fine']);
+console.log('nsarray:', nsarray);
 
 // Iterate over an array
-for (let str of array) {
-	//console.log(String(str));
+for (let item of nsarray) {
+  console.log(item);
 }
 
 
@@ -39,20 +39,8 @@ for (let str of array) {
 
 
 // Sort using block
+const shortestToLongest = new objc.NSComparator((arg1, arg2) => (arg1.length() < arg2.length()) ? -1 : +1);
 
-var block = new objc.Block((arg1, arg2) => {
-	arg1 = objc.wrap(arg1);
-	arg2 = objc.wrap(arg2);
-	return arg1.length() < arg2.length() ? -1 : 1;
-}, 'q', ['@', '@']);
+// sorted by length: [objc ( so, you, Hey, fine, missy )]
+console.log("sorted by length:", nsarray.sortedArrayUsingComparator_(shortestToLongest));
 
-
-let sortedUsingBlock = array.sortedArrayUsingComparator_(block);
-console.log(sortedUsingBlock);
-
-
-
-
-
-
-//s
