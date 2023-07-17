@@ -1,4 +1,4 @@
-const ref = require('ref-napi');
+const ref = require('@breush/ref-napi');
 const objc = require('../src/index');
 
 const {

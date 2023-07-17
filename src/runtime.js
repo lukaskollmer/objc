@@ -1,7 +1,7 @@
 /* eslint-disable camelcase, key-spacing, no-multi-spaces, array-bracket-spacing */
 
-const ffi = require('ffi-napi');
-const ref = require('ref-napi');
+const ffi = require('@breush/ffi-napi');
+const ref = require('@breush/ref-napi');
 
 const dlfcn = new ffi.Library(null, {
   dlopen: ['pointer', ['string', 'int']]

@@ -122,7 +122,7 @@ console.log(NSFontAttributeName);   // => 'NSFont'
 
 
 ### Structs
-Use the `objc.defineStruct` function to define a struct by its name and layout. The returned type can be used to create instances of the struct, and when specifying type encodings in the `objc` module. It is also compatible with the `ffi-napi`, `ref-napi`, `ref-struct-di` modules.
+Use the `objc.defineStruct` function to define a struct by its name and layout. The returned type can be used to create instances of the struct, and when specifying type encodings in the `objc` module. It is also compatible with the `@breush/ffi-napi`, `@breush/ref-napi`, `ref-struct-di` modules.
 
 You can use the `StructType.new` function to create an instance of the struct. Optionally, you can pass 
 
@@ -141,7 +141,7 @@ const substring = string.substringWithRange_(NSRange.new(0, 5));
 <summary><strong>Example 2**</strong> Using structs with the ffi module</summary>
 
 ```js
-const ffi = require('ffi-napi');
+const ffi = require('@breush/ffi-napi');
 const CGFloat = objc.types.double;
 
 const CGPoint = objc.defineStruct('CGPoint', {

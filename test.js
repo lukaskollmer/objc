@@ -637,7 +637,7 @@ test('Blocks: objc.Block passes for full block type encoding', t => {
 
 
 test('Blocks: Block w/ struct parameter and inout BOOL*', t => {
-  const ref = require('ref-napi');
+  const ref = require('@breush/ref-napi');
   objc.import('AppKit');
   const { NSAttributedString, NSMutableAttributedString, NSLinkAttributeName } = objc;
   const { id, NSRange } = objc.types;
@@ -979,7 +979,7 @@ test('[struct] struct as return type', t => {
 
 
 test('[struct] struct defined in objc module works with ffi module', t => {
-  const ffi = require('ffi-napi');
+  const ffi = require('@breush/ffi-napi');
   const libFoundation = new ffi.Library(null, {
     NSStringFromRange: ['pointer', [NSRange]]
   });

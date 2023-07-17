@@ -1,5 +1,5 @@
 const objc = require('../');
-const ffi = require('ffi-napi');
+const ffi = require('@breush/ffi-napi');
 const CGFloat = objc.types.double;
 
 const CGPoint = objc.defineStruct('CGPoint', {

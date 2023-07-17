@@ -1,6 +1,6 @@
 /* eslint-disable quote-props */
 
-const ref = require('ref-napi');
+const ref = require('@breush/ref-napi');
 const structs = require('./structs');
 
 // This file contains the following:

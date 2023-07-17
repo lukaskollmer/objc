@@ -1,4 +1,4 @@
-const ref = require('ref-napi')
+const ref = require('@breush/ref-napi')
 const struct = require('ref-struct-di')(ref);
 
 const CompoundInit = Symbol('structs.CompoundInit');

@@ -1,5 +1,5 @@
 const objc = require('../');
-const ref = require('ref-napi');
+const ref = require('@breush/ref-napi');
 
 objc.import('AppKit');
 

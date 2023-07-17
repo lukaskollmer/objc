@@ -1,5 +1,5 @@
 /* eslint-disable camelcase, key-spacing */
-const ffi = require('ffi-napi');
+const ffi = require('@breush/ffi-napi');
 const structs = require('./structs');
 const {pointer, int32, ulonglong} = require('./types');
 const runtime = require('./runtime');
